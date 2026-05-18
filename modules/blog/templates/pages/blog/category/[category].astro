@@ -1,0 +1,40 @@
+---
+import { blog } from '../../../lib/blog';
+
+export async function getStaticPaths() {
+  return blog.getAllCategorySlugs().map((category) => ({ params: { category } }));
+}
+
+const { category } = Astro.params;
+const cat = blog.getCategoryBySlug(category as string);
+const posts = await blog.getPostsByCategory(category as string);
+
+if (!cat) {
+  return Astro.redirect('/404');
+}
+---
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>{cat.title}</title>
+    <meta name="description" content={cat.metaDescription} />
+    <link rel="canonical" href={`${Astro.site}blog/category/${cat.slug}/`} />
+  </head>
+  <body>
+    <main>
+      <h1>{cat.title}</h1>
+      <p>{cat.subtitle}</p>
+      <ul>
+        {posts.map((post) => (
+          <li>
+            <a href={`/blog/${post.slug}/`}>
+              <h2>{post.title}</h2>
+              <p>{post.description}</p>
+            </a>
+          </li>
+        ))}
+      </ul>
+    </main>
+  </body>
+</html>

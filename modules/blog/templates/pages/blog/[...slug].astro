@@ -1,0 +1,53 @@
+---
+import { blog } from '../../lib/blog';
+
+export async function getStaticPaths() {
+  const slugs = await blog.getAllPostSlugs();
+  return slugs.map((slug) => ({ params: { slug } }));
+}
+
+const { slug } = Astro.params;
+const post = await blog.getPostBySlug(slug as string);
+
+if (!post) {
+  return Astro.redirect('/404');
+}
+
+const canonical = `${Astro.site}blog/${post.slug}/`;
+---
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>{post.title}</title>
+    <meta name="description" content={post.description} />
+    <link rel="canonical" href={canonical} />
+    {post.image && <meta property="og:image" content={`${Astro.site.origin}${post.image}`} />}
+    <meta property="og:title" content={post.title} />
+    <meta property="og:description" content={post.description} />
+    <meta property="og:type" content="article" />
+    <meta property="og:url" content={canonical} />
+  </head>
+  <body>
+    <article>
+      <header>
+        <h1>{post.title}</h1>
+        <p>{post.date} · {post.readingTime}{post.author && ` · ${post.author}`}</p>
+      </header>
+      <div set:html={post.content} />
+      {post.faqs && post.faqs.length > 0 && (
+        <section>
+          <h2>FAQs</h2>
+          <dl>
+            {post.faqs.map((faq) => (
+              <>
+                <dt>{faq.question}</dt>
+                <dd>{faq.answer}</dd>
+              </>
+            ))}
+          </dl>
+        </section>
+      )}
+    </article>
+  </body>
+</html>

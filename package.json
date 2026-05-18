@@ -1,0 +1,73 @@
+{
+  "name": "@ibalzam/codejitsu-core",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Shared core for Codejitsu Astro sites — reusable code and Claude-facing instructions for blog, SEO, images, deploy, and llms.txt.",
+  "keywords": [
+    "astro",
+    "blog",
+    "seo",
+    "schema.org",
+    "sitemap",
+    "llms.txt",
+    "cloudflare-pages",
+    "webp",
+    "claude"
+  ],
+  "license": "MIT",
+  "author": "Ika Balzam <ika@codejitsu.ca>",
+  "homepage": "https://github.com/ibalzam/codejitsu-site-kit#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ibalzam/codejitsu-site-kit.git"
+  },
+  "bugs": {
+    "url": "https://github.com/ibalzam/codejitsu-site-kit/issues"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "exports": {
+    ".": "./src/index.ts",
+    "./blog": "./modules/blog/src/index.ts",
+    "./blog/components": "./modules/blog/src/components/index.ts",
+    "./seo": "./modules/seo/src/index.ts",
+    "./seo/schema": "./modules/seo/src/schema.ts",
+    "./seo/sitemap": "./modules/seo/src/sitemap.ts",
+    "./images": "./modules/images/src/index.ts",
+    "./package.json": "./package.json"
+  },
+  "bin": {
+    "codejitsu-llms": "./modules/llms/bin/generate.mjs",
+    "codejitsu-optimize-images": "./modules/images/bin/optimize.mjs",
+    "codejitsu-check": "./checklist/bin/run.mjs"
+  },
+  "files": [
+    "src",
+    "modules",
+    "checklist",
+    "MIGRATIONS",
+    "CLAUDE.md",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run typecheck"
+  },
+  "peerDependencies": {
+    "astro": ">=5.0.0"
+  },
+  "dependencies": {
+    "gray-matter": "^4.0.3",
+    "reading-time": "^1.5.0",
+    "sharp": "^0.33.5"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "typescript": "^5.4.0"
+  }
+}

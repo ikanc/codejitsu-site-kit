@@ -1,0 +1,35 @@
+---
+import { blog } from '../../../lib/blog';
+
+export async function getStaticPaths() {
+  const tags = await blog.getAllTags();
+  return tags.map((tag) => ({ params: { tag } }));
+}
+
+const { tag } = Astro.params;
+const posts = await blog.getPostsByTag(tag as string);
+---
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Posts tagged "{tag}"</title>
+    <meta name="description" content={`Articles tagged with ${tag}`} />
+    <link rel="canonical" href={`${Astro.site}blog/tag/${tag}/`} />
+  </head>
+  <body>
+    <main>
+      <h1>Tag: {tag}</h1>
+      <ul>
+        {posts.map((post) => (
+          <li>
+            <a href={`/blog/${post.slug}/`}>
+              <h2>{post.title}</h2>
+              <p>{post.description}</p>
+            </a>
+          </li>
+        ))}
+      </ul>
+    </main>
+  </body>
+</html>

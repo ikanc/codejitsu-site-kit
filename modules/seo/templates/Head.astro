@@ -1,0 +1,53 @@
+---
+import { jsonLd } from '@ibalzam/codejitsu-core/seo/schema';
+
+interface Props {
+  title: string;
+  description: string;
+  /** Absolute URL (with trailing slash). Defaults to current page. */
+  canonical?: string;
+  /** Absolute URL to OG image. */
+  ogImage?: string;
+  /** og:type. Defaults to 'website'. */
+  ogType?: 'website' | 'article';
+  /** JSON-LD schema objects to inject. Use builders from @ibalzam/codejitsu-core/seo/schema. */
+  schema?: unknown[];
+  /** Override <html lang>. Defaults to 'en'. */
+  noindex?: boolean;
+}
+
+const {
+  title,
+  description,
+  canonical,
+  ogImage,
+  ogType = 'website',
+  schema = [],
+  noindex = false,
+} = Astro.props;
+
+const canonicalUrl = canonical ?? new URL(Astro.url.pathname, Astro.site).toString();
+const absOgImage = ogImage
+  ? new URL(ogImage, Astro.site).toString()
+  : undefined;
+---
+
+<title>{title}</title>
+<meta name="description" content={description} />
+<link rel="canonical" href={canonicalUrl} />
+{noindex && <meta name="robots" content="noindex,follow" />}
+
+<meta property="og:title" content={title} />
+<meta property="og:description" content={description} />
+<meta property="og:url" content={canonicalUrl} />
+<meta property="og:type" content={ogType} />
+{absOgImage && <meta property="og:image" content={absOgImage} />}
+
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content={title} />
+<meta name="twitter:description" content={description} />
+{absOgImage && <meta name="twitter:image" content={absOgImage} />}
+
+{schema.map((item) => (
+  <script type="application/ld+json" set:html={jsonLd(item)} />
+))}
