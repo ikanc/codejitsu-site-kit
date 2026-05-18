@@ -1,6 +1,6 @@
 {
   "name": "@ibalzam/codejitsu-core",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
   "description": "Shared core for Codejitsu Astro sites — reusable code and Claude-facing instructions for blog, SEO, images, deploy, and llms.txt.",
   "keywords": [
@@ -64,7 +64,9 @@
     "astro": ">=5.0.0"
   },
   "peerDependenciesMeta": {
-    "astro": { "optional": true }
+    "astro": {
+      "optional": true
+    }
   },
   "optionalDependencies": {
     "jiti": "^2.0.0"
