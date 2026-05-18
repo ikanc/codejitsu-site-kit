@@ -1,67 +1,83 @@
 # Master instructions — @ibalzam/codejitsu-core
 
-This is the shared core for all Codejitsu sites. When a Codejitsu site depends on this package and the user invokes a module by name (e.g. **"implement codejitsu/core/blog"**, **"add codejitsu/core/seo"**), this file is your starting point.
+Shared core for every Codejitsu site. When the user invokes a module by name (e.g. **"implement codejitsu/core/blog"**), this file is your starting point.
 
 ## How to act on a module request
 
-1. Open `node_modules/@ibalzam/codejitsu-core/modules/<name>/CLAUDE.md` — it tells you what to do for that module specifically.
-2. Import code from the matching subpath (e.g. `@ibalzam/codejitsu-core/blog`). Do **not** copy-paste the source into the site.
-3. If the module has a `templates/` directory, copy those files into the site at the locations the module's CLAUDE.md specifies. Templates are starting points — adapt them for the site's content.
-4. After the change, run the module's `checklist.md` mentally, plus `checklist/core.md` (sitewide).
+1. **Always start with the unified config.** Open `codejitsu.config.ts` at the site root. If it doesn't exist yet, create one — see `modules/config/CLAUDE.md`.
+2. Open `node_modules/@ibalzam/codejitsu-core/modules/<name>/CLAUDE.md` for that module's specific wiring instructions.
+3. Import code from the matching subpath (e.g. `@ibalzam/codejitsu-core/blog`). Do **not** copy-paste source into the site.
+4. If the module has a `templates/` directory, copy those files into the site at the locations the module's CLAUDE.md specifies. Adapt templates for the site's brand and content.
+5. After the change, walk through the module's `checklist.md` plus `checklist/core.md` (sitewide). Run `npx codejitsu-check` from the site root.
+
+## Module subpaths
+
+| Subpath | Provides |
+|---|---|
+| `@ibalzam/codejitsu-core/config` | `defineConfig()`, `loadConfig()`, all types |
+| `@ibalzam/codejitsu-core/blog` | `createBlog()` (fs+gray-matter), `createBlogFromCollection()` (Astro CC) |
+| `@ibalzam/codejitsu-core/seo` | Schema builders, sitemap helpers, `jsonLd()` |
+| `@ibalzam/codejitsu-core/seo/schema` | Schema builders only |
+| `@ibalzam/codejitsu-core/seo/sitemap` | Sitemap helpers only |
+| `@ibalzam/codejitsu-core/images` | `optimizeImages()`, `autoBlogImages()` (mostly used via CLI) |
+| `@ibalzam/codejitsu-core/llms` | `generateLlms()` (mostly used via CLI) |
+
+CLIs (auto-discover `codejitsu.config.ts`):
+- `codejitsu-optimize-images`
+- `codejitsu-llms`
+- `codejitsu-check`
 
 ## Principles that apply to every Codejitsu site
 
-These are non-negotiable unless the user explicitly opts out:
+Non-negotiable unless the user explicitly opts out.
 
 ### Stack
-- **Astro** (latest stable). Pure static output (`output: 'static'`).
-- **Tailwind v4** via `@tailwindcss/vite`. Theme via CSS variables on `:root`, not hardcoded color palettes.
-- **TypeScript** everywhere except config files where Astro/Vite expects `.mjs`.
-- **React** integration only if the site needs interactive client islands (Framer, charts). Otherwise pure Astro.
+- **Astro** (latest stable). Pure static (`output: 'static'`).
+- **Tailwind v4** via `@tailwindcss/vite`. Theme via CSS variables, not hardcoded palettes.
+- **TypeScript** everywhere except where Astro/Vite expects `.mjs`.
+- **React** integration only if the site needs client islands (Framer, charts). Otherwise pure Astro.
+- **Astro Content Collections** for blog (use `createBlogFromCollection`). The fs loader is for non-Astro projects.
 
 ### Deploy
 - **Cloudflare Pages**, static deploy. `wrangler.toml` at site root.
-- `npm run build && npx wrangler pages deploy dist` is the deploy command (or git-integration on Pages).
-- Daily GH Action (`.github/workflows/daily-deploy.yml`) pings a Cloudflare deploy hook to publish scheduled content. See `modules/deploy/`.
+- Daily GH Action pings the Cloudflare deploy hook to publish scheduled content.
 
 ### URLs + routing
-- `trailingSlash: 'always'` in Astro config. Every internal link ends with `/`.
-- Canonical URLs are absolute and trailing-slashed.
+- `trailingSlash: 'always'`. Internal links end with `/`.
+- Canonical URLs absolute, trailing-slashed.
 
 ### Images
-- Source images in `public/images/` (or `src/assets/` for Astro-processed). Originals can be PNG/JPG.
-- Every shipped image must be available as WebP. The Astro sharp service handles `<Image>` references automatically (`image.defaults: { quality: 82, format: 'webp' }`). For images referenced by URL in HTML/CSS, run the pre-pass: `npx codejitsu-optimize-images`.
-- No raw PNGs referenced from production HTML when a WebP equivalent exists.
+- Source images for general assets in `public/...`; auto-converted to WebP via `codejitsu-optimize-images` in `prebuild`.
+- Blog source images live OUTSIDE `public/` (e.g. `private/blog-source-images/`), named `<slug>.{png,jpg,jpeg,webp}`. The CLI optimizes them to `public/assets/images/blog/<slug>.webp` via `autoBlogImages`.
+- Astro `<Image>` auto-converts components-loaded images. Use it for hero / inline imagery imported from `src/assets/`.
+- No raw PNG/JPG references in production HTML where a `.webp` sibling exists.
 
-### SEO (must be on every page)
-- `<title>` and `<meta name="description">` set per page.
-- Canonical URL `<link rel="canonical">`.
-- OG meta (`og:title`, `og:description`, `og:image`, `og:url`, `og:type`).
-- Twitter card meta.
-- JSON-LD schema.org appropriate to the page type (Organization on home, LocalBusiness if applicable, BlogPosting on blog posts, FAQPage if FAQs present). Use builders from `@ibalzam/codejitsu-core/seo/schema`.
-- `sitemap.xml` generated via `@astrojs/sitemap` with helpers from `@ibalzam/codejitsu-core/seo/sitemap`.
+### SEO (every page)
+- `<title>`, meta description, canonical, OG, Twitter, JSON-LD via `<SiteHead />` (site wrapper around `@ibalzam/codejitsu-core/seo/Head.astro`).
+- Schemas from `@ibalzam/codejitsu-core/seo` builders. Inject with `jsonLd()` (never raw `JSON.stringify`).
+- `sitemap.xml` generated via `@astrojs/sitemap` + `defaultPriorityRules()` + `excludeFuturePosts()`.
 - `robots.txt` at site root.
-- `/llms.txt` + `/llms-full.txt` generated via `npx codejitsu-llms` in prebuild.
+- `/llms.txt` + `/llms-full.txt` generated via `codejitsu-llms` in prebuild.
 
 ### Content
-- Blog posts as Markdown in `content/blog/` with frontmatter (see `modules/blog/CLAUDE.md`).
-- Future-dated posts are hidden from public pages and sitemap but kept addressable for OG meta scrapers.
-- All copy in English unless the site uses the i18n module (workzen-only currently).
+- Blog posts as `.md` in `src/content/blog/` with frontmatter validated by an Astro CC schema.
+- Future-dated posts hidden from public pages and sitemap; pages built for OG scrapers.
+- `draft: true` posts excluded everywhere.
 
 ### What NOT to do
-- Don't reinvent modules that exist here. If you're tempted to write a blog loader, image optimizer, sitemap config, schema builder, or daily-deploy workflow, **import or copy from this package instead**.
-- Don't hardcode brand colors in component files — always via Tailwind theme tokens / CSS variables.
-- Don't add a runtime database, server-rendered routes, or anything that breaks static export. These sites deploy as plain HTML.
-- Don't add page-level redirects in code; use Cloudflare Pages `_redirects` or `_headers`.
-- Don't introduce a new heavy dependency without checking if existing modules already cover it.
+- Don't reinvent modules. Always import or copy from this package.
+- Don't hardcode brand colors in component files — use Tailwind theme tokens / CSS variables.
+- Don't add server-rendered routes or anything that breaks static export.
+- Don't write to `dist/` directly. All artifacts flow from `prebuild` + `astro build`.
+- Don't keep old per-module config files (`codejitsu-images.config.mjs`, `codejitsu-llms.config.mjs`). Only `codejitsu.config.ts` is read in v0.2.0+.
 
 ## After any non-trivial change
 
-Run through `checklist/core.md` before reporting work as done. For UI changes, build the site and view the pages in a browser — type-checking is not visual verification.
+`npx codejitsu-check` and walk `checklist/core.md`. For UI: build, open in browser, verify visually.
 
-## Updating to a new version of `@ibalzam/codejitsu-core`
+## Upgrading `@ibalzam/codejitsu-core`
 
 1. `npm update @ibalzam/codejitsu-core`
-2. Read `node_modules/@ibalzam/codejitsu-core/MIGRATIONS/` for any version notes newer than the previous installed version.
-3. Apply migration steps in order. They're prose, not codemods — judgment is fine; ask the user when ambiguous.
-4. Run `checklist/core.md` to verify nothing regressed.
+2. Read every `MIGRATIONS/<version>.md` between the old installed version and the new one.
+3. Apply migration steps in order. They're prose — judgment is fine; ask the user when ambiguous.
+4. Run `codejitsu-check` to verify.

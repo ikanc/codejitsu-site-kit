@@ -16,5 +16,5 @@
     "types": ["node"]
   },
   "include": ["src/**/*", "modules/**/*", "checklist/**/*"],
-  "exclude": ["node_modules", "**/*.astro"]
+  "exclude": ["node_modules", "**/*.astro", "**/templates/**"]
 }

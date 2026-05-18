@@ -1,53 +1,125 @@
 ---
-import { jsonLd } from '@ibalzam/codejitsu-core/seo/schema';
+/**
+ * Codejitsu Head — drop into a layout's <head>.
+ *
+ * Wraps SEO meta, OG/Twitter, canonical, hreflang, article metadata,
+ * hero preload, and JSON-LD schema injection. Site-specific analytics
+ * (GA, Ahrefs, reCAPTCHA, etc.) belong in a site wrapper, not here.
+ *
+ * Recommended: create `src/components/SiteHead.astro` that imports this
+ * and passes defaults from your `codejitsu.config.ts`. See module CLAUDE.md.
+ */
+import { jsonLd } from '@ibalzam/codejitsu-core/seo';
 
 interface Props {
+  /** Page title (will be combined with `titleSuffix` if not too long). */
   title: string;
+  /** Page description (meta + og + twitter). */
   description: string;
-  /** Absolute URL (with trailing slash). Defaults to current page. */
-  canonical?: string;
-  /** Absolute URL to OG image. */
-  ogImage?: string;
+  /** Optional explicit path (without site URL). Defaults to current page path. */
+  path?: string;
+  /** OG image. Relative paths are resolved against site URL. */
+  image?: string;
   /** og:type. Defaults to 'website'. */
-  ogType?: 'website' | 'article';
-  /** JSON-LD schema objects to inject. Use builders from @ibalzam/codejitsu-core/seo/schema. */
-  schema?: unknown[];
-  /** Override <html lang>. Defaults to 'en'. */
+  type?: 'website' | 'article';
+  /** JSON-LD schema(s) to inject. Use builders from `@ibalzam/codejitsu-core/seo`. */
+  schema?: Record<string, unknown> | Record<string, unknown>[];
+  /** Emit noindex,nofollow. */
   noindex?: boolean;
+  /** Hero image to preload (LCP). Absolute path or full URL. */
+  heroImage?: string;
+  /** Article author name (only emitted when type='article'). */
+  author?: string;
+  /** ISO date strings (only emitted when type='article'). */
+  publishedTime?: string;
+  modifiedTime?: string;
+  /** Site URL (no trailing slash). Required. e.g. 'https://example.com'. */
+  siteUrl: string;
+  /** Site brand name. Used for og:site_name and (if present) title suffix. */
+  siteName: string;
+  /** Locale, e.g. 'en_US'. Default 'en_US'. */
+  locale?: string;
+  /** Appended to <title> with " | "; only if combined length <= 65 chars. */
+  titleSuffix?: string;
 }
 
 const {
   title,
   description,
-  canonical,
-  ogImage,
-  ogType = 'website',
-  schema = [],
+  path,
+  image,
+  type = 'website',
+  schema,
   noindex = false,
+  heroImage,
+  author,
+  publishedTime,
+  modifiedTime,
+  siteUrl,
+  siteName,
+  locale = 'en_US',
+  titleSuffix,
 } = Astro.props;
 
-const canonicalUrl = canonical ?? new URL(Astro.url.pathname, Astro.site).toString();
-const absOgImage = ogImage
-  ? new URL(ogImage, Astro.site).toString()
+const SITE = siteUrl.replace(/\/$/, '');
+const currentPath = path ?? Astro.url.pathname;
+const canonicalPath = currentPath
+  ? `/${currentPath.replace(/^\//, '').replace(/\/$/, '')}/`
+  : '/';
+const isHomepage = canonicalPath === '/';
+const canonicalURL = `${SITE}${canonicalPath}`;
+
+const suffix = titleSuffix ?? siteName;
+const candidateTitle = `${title} | ${suffix}`;
+const fullTitle = isHomepage || !suffix
+  ? title
+  : candidateTitle.length <= 65 ? candidateTitle : title;
+
+const ogImage = image
+  ? (image.startsWith('http') ? image : `${SITE}${image.startsWith('/') ? '' : '/'}${image}`)
   : undefined;
+
+const schemas = schema ? (Array.isArray(schema) ? schema : [schema]) : [];
+const hreflang = locale.replace('_', '-');
 ---
 
-<title>{title}</title>
+<title>{fullTitle}</title>
 <meta name="description" content={description} />
-<link rel="canonical" href={canonicalUrl} />
-{noindex && <meta name="robots" content="noindex,follow" />}
+<link rel="canonical" href={canonicalURL} />
+<link rel="alternate" href={canonicalURL} hreflang={hreflang} />
+<link rel="alternate" href={canonicalURL} hreflang="x-default" />
 
-<meta property="og:title" content={title} />
+{heroImage && (
+  <link rel="preload" as="image" href={heroImage} type="image/webp" fetchpriority="high" />
+)}
+
+{noindex
+  ? <meta name="robots" content="noindex, nofollow" />
+  : <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
+}
+
+<meta property="og:type" content={type} />
+<meta property="og:title" content={fullTitle} />
 <meta property="og:description" content={description} />
-<meta property="og:url" content={canonicalUrl} />
-<meta property="og:type" content={ogType} />
-{absOgImage && <meta property="og:image" content={absOgImage} />}
+<meta property="og:url" content={canonicalURL} />
+{ogImage && <meta property="og:image" content={ogImage} />}
+<meta property="og:site_name" content={siteName} />
+<meta property="og:locale" content={locale} />
+{ogImage && <meta property="og:image:width" content="1200" />}
+{ogImage && <meta property="og:image:height" content="630" />}
+
+{type === 'article' && publishedTime && <meta property="article:published_time" content={publishedTime} />}
+{type === 'article' && modifiedTime && <meta property="article:modified_time" content={modifiedTime} />}
+{type === 'article' && author && <meta property="article:author" content={author} />}
 
 <meta name="twitter:card" content="summary_large_image" />
-<meta name="twitter:title" content={title} />
+<meta name="twitter:title" content={fullTitle} />
 <meta name="twitter:description" content={description} />
-{absOgImage && <meta name="twitter:image" content={absOgImage} />}
+{ogImage && <meta name="twitter:image" content={ogImage} />}
+{ogImage && <meta name="twitter:image:alt" content={`${title} - ${siteName}`} />}
 
-{schema.map((item) => (
-  <script type="application/ld+json" set:html={jsonLd(item)} />
+{schemas.map((s) => (
+  <script type="application/ld+json" is:inline set:html={jsonLd(s)} />
 ))}
+
+<slot />

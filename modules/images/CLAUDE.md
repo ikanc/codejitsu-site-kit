@@ -1,39 +1,62 @@
 # Images module — instructions for Claude
 
-When the user asks to **set up codejitsu/core/images** (or "wire up the image pipeline", "convert PNGs to WebP"), do the following.
+When the user asks to **set up codejitsu/core/images** (or "wire up the image pipeline", "convert PNGs to WebP", "automate blog images"), do the following.
 
 ## What this module provides
 
-Two complementary layers:
+Three layers — use whichever you need:
 
-1. **Astro sharp service** (runtime, automatic) — handles `<Image>` imports and `<Picture>` components inside `.astro` files. Configured in `astro.config.mjs`.
-2. **Pre-pass CLI** (`npx codejitsu-optimize-images`) — recursively converts every `.png`/`.jpg`/`.jpeg` in `public/images/` to `.webp` (plus thumbnails). For images referenced by URL (in HTML strings, CSS `background-image`, or `<img src>` outside Astro processing).
+1. **Astro sharp service** (runtime, automatic) — `<Image>` / `<Picture>` in `.astro` files. Configured in `astro.config.mjs`.
+2. **`codejitsu-optimize-images` CLI** — recursive PNG/JPG → WebP pre-pass for `public/` (general site assets, logos, hero images). Per-file `specialRules` overrides.
+3. **`autoBlogImages` mode** — given a content collection of `<slug>.md` files and a source-image directory with `<slug>.<ext>` files, emits optimized WebPs to an output dir. Replaces hand-maintained title→slug maps.
 
-Both layers are needed. Astro's service can't reach files referenced by URL; the pre-pass can't add the responsive variants Astro generates.
+All three read from the **single `codejitsu.config.ts`** at site root.
 
 ## Wiring it into a site
 
-### 1. Configure Astro
+### 1. Configure Astro sharp service
 
 In `astro.config.mjs`:
 
 ```ts
+image: {
+  service: { entrypoint: 'astro/assets/services/sharp' },
+  defaults: { quality: 82, format: 'webp' },
+},
+```
+
+### 2. Configure the CLI in `codejitsu.config.ts`
+
+```ts
+import { defineConfig } from '@ibalzam/codejitsu-core/config';
+
 export default defineConfig({
-  // ...
-  image: {
-    service: { entrypoint: 'astro/assets/services/sharp' },
-    defaults: { quality: 82, format: 'webp' },
+  site: { url: '...', name: '...' },
+  images: {
+    // General optimizer — scan a dir, convert every PNG/JPG to WebP.
+    sourceDir: 'public/assets/images',
+    defaultQuality: 82,
+    defaultMaxSize: 1376,
+
+    specialRules: {
+      'logos/logo': { maxWidth: 400, quality: 35, generateAvif: true },
+      'sharing/og-default': { maxWidth: 1200, maxHeight: 630, quality: 85, optimizePng: true },
+    },
+
+    // Blog image automation — one image per post slug.
+    autoBlogImages: {
+      contentDir: 'src/content/blog',
+      sourceImageDir: 'private/blog-source-images',   // not committed
+      outputDir: 'public/assets/images/blog',
+      width: 1376,
+      height: null,                                    // preserve aspect ratio
+      quality: 82,
+    },
   },
 });
 ```
 
-### 2. Copy the optimizer config
-
-Copy `templates/codejitsu-images.config.mjs` → site root. Edit `specialRules` for any images that need special handling (logo, OG share images, hero images that need aggressive compression).
-
-### 3. Wire the pre-pass into the build
-
-In the site's `package.json`:
+### 3. Wire into prebuild
 
 ```json
 {
@@ -44,34 +67,28 @@ In the site's `package.json`:
 }
 ```
 
-If the site already has a `prebuild` script, chain: `"prebuild": "codejitsu-optimize-images && existing-script"`.
+### 4. Workflow for new blog images (with autoBlogImages)
 
-### 4. Run once
+1. Generate or save the source image (any size, any format).
+2. **Name it after the post slug** — e.g. `backyard-patio-ideas-henderson-summer-heat.png`.
+3. Place it in `images.autoBlogImages.sourceImageDir`.
+4. Run `npm run prebuild` (or just `npm run build` — it runs prebuild first).
+5. The optimized WebP appears at `<outputDir>/<slug>.webp`. Commit it.
 
-```bash
-npm run prebuild
-```
-
-Every PNG/JPG in `public/images/` now has a `.webp` sibling. References in HTML/CSS should use the `.webp` filename.
-
-## How to reference images in templates
-
-- **In Astro `<Image>` / `<Picture>`:** import from `src/assets/` or `~/assets/`. Astro processes them. Format defaults to WebP.
-- **In raw `<img>` / CSS `background-image`:** reference the `.webp` file directly. Don't reference `.png` if a `.webp` exists.
-- **OG / share images:** these are referenced by absolute URL on a CDN. Set `optimizePng: true` in `specialRules` so the original PNG is also compressed (Facebook scrapers sometimes prefer PNG over WebP).
+The CLI warns about post slugs with no matching source image. No more hand-edited maps.
 
 ## What must NOT be done
 
-- **Don't reference `.png` in production HTML when the same image exists as `.webp`.** The `<img src="/images/x.png">` should be `<img src="/images/x.webp">`. Checklist enforces this.
-- **Don't commit the generated `.webp` files... actually, DO commit them.** They're build artifacts but committing avoids forcing CI to install sharp. (Re-evaluate if `public/images` grows huge.)
-- **Don't run the optimizer manually expecting it to skip already-converted files.** Sharp re-processes each run; this is intentional (so quality changes propagate). Re-running is cheap because outputs are written to siblings, not appended.
-- **Don't put the optimizer in a `postinstall` hook.** Building on every `npm install` is annoying.
-- **Don't add raw PNG/JPG to `src/assets/` for Astro `<Image>` use.** Astro handles those fine; the pre-pass is only for `public/`.
+- **Don't keep an old `codejitsu-images.config.mjs` file around.** v0.2.0 hard-broke it; only `codejitsu.config.ts` is read.
+- **Don't reference `.png` in production HTML when a `.webp` exists** at the same path. The Astro `<Image>` component handles it; raw `<img src>` must point to the `.webp`.
+- **Don't put source images for `autoBlogImages` inside `public/`.** They get served. Use a sibling dir like `private/blog-source-images/` (and add it to `.gitignore` if the sources are heavy / AI-generated).
+- **Don't run the optimizer expecting it to skip up-to-date general files.** Only `autoBlogImages` does mtime-based skipping. The general optimizer re-processes every file (so quality changes propagate). Re-running is cheap.
+- **Don't put `autoBlogImages.sourceImageDir` and `outputDir` to the same place.** That'd recursively re-optimize outputs.
 
 ## Verify
 
-- [ ] `astro.config.mjs` has `image.defaults: { format: 'webp' }`.
-- [ ] `codejitsu-images.config.mjs` exists at site root.
-- [ ] `package.json` calls `codejitsu-optimize-images` in `prebuild`.
-- [ ] Every `.png`/`.jpg` in `public/images/` has a `.webp` sibling after build.
+- [ ] `codejitsu.config.ts` has an `images` section.
+- [ ] `prebuild` script in `package.json` runs `codejitsu-optimize-images`.
+- [ ] Every PNG/JPG in `images.sourceDir` has a `.webp` sibling after build.
+- [ ] If `autoBlogImages` is configured: every `.md` in `contentDir` has a matching `.webp` in `outputDir`.
 - [ ] No `<img src="*.png">` in built HTML where a `.webp` sibling exists.

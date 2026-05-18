@@ -11,13 +11,33 @@ Sites stay thin: configuration + content + brand. Everything else lives here.
 
 | Module | Subpath | What it provides |
 |---|---|---|
-| `blog` | `@ibalzam/codejitsu-core/blog` | Markdown-based blog system with scheduled publishing, FAQs, tags, categories |
-| `seo` | `@ibalzam/codejitsu-core/seo` | Sitemap helpers, schema.org JSON-LD builders, meta tag patterns |
-| `images` | `@ibalzam/codejitsu-core/images` + `codejitsu-optimize-images` CLI | PNG/JPG→WebP pre-pass + Astro sharp defaults |
+| `config` | `@ibalzam/codejitsu-core/config` | `defineConfig()` + types for the unified `codejitsu.config.ts` |
+| `blog` | `@ibalzam/codejitsu-core/blog` | `createBlog()` (fs+gray-matter) and `createBlogFromCollection()` (Astro CC) with scheduled publishing, drafts, dual-slug, FAQs, tags, categories |
+| `seo` | `@ibalzam/codejitsu-core/seo` | Sitemap helpers, schema.org JSON-LD builders, safe `jsonLd()` injection, `Head.astro` template |
+| `images` | `codejitsu-optimize-images` CLI | PNG/JPG→WebP optimizer + `autoBlogImages` (one image per post slug) |
 | `deploy` | (templates only) | GH Action daily-deploy + Cloudflare wrangler templates |
-| `llms` | `codejitsu-llms` CLI | Generates `/llms.txt` + `/llms-full.txt` from site content |
+| `llms` | `codejitsu-llms` CLI | Generates `/llms.txt` + `/llms-full.txt`. Config-driven or content-scan modes |
 
-Plus `checklist/` — sitewide invariants Claude verifies after any non-trivial change.
+Plus `checklist/` — sitewide invariants Claude verifies after any non-trivial change (`codejitsu-check` CLI).
+
+## Unified config
+
+Every module reads from one file at the site root: `codejitsu.config.ts` (or `.mjs`, `.json`, or `codejitsu` key in `package.json`).
+
+```ts
+import { defineConfig } from '@ibalzam/codejitsu-core/config';
+
+export default defineConfig({
+  site: { url: 'https://...', name: '...', business: { /* ... */ } },
+  blog: { mode: 'collection', dateField: 'pubDate', draftField: 'draft' },
+  seo: { sitemap: { excludePatterns: [/\/lp\//] } },
+  images: { /* ... */ },
+  llms: { mode: 'content-scan', /* ... */ },
+  deploy: { /* ... */ },
+});
+```
+
+See `modules/config/CLAUDE.md` for the full shape.
 
 ## How Claude uses this package
 

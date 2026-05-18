@@ -4,26 +4,25 @@ import { existsSync } from 'fs';
 import { join, dirname, parse, relative } from 'path';
 
 /**
- * Recursively converts JPG/JPEG/PNG → WebP under `sourceDir`, writing
- * matching thumbnails under `thumbDir`. Per-file rules can override
- * defaults (quality, dimensions, AVIF generation, in-place PNG optimization).
+ * General recursive PNG/JPG → WebP optimizer.
+ *
+ * Walks `sourceDir` recursively. For every .jpg/.jpeg/.png, emits a .webp sibling.
+ * Per-file overrides via `specialRules`. Optional thumbnail generation.
  *
  * @param {object} config
- * @param {string} config.sourceDir          Absolute path to source images.
- * @param {string} config.thumbDir           Absolute path to write thumbnails (skipped if same as sourceDir).
+ * @param {string} config.sourceDir
+ * @param {string|null} [config.thumbDir]    Null = no thumbs.
  * @param {number} [config.defaultQuality=75]
  * @param {number} [config.defaultMaxSize=1200]
  * @param {number} [config.thumbSize=400]
  * @param {number} [config.thumbQuality=70]
  * @param {Record<string, SpecialRule>} [config.specialRules]
  *   Key = path relative to sourceDir without extension (e.g. 'logos/logo').
- *   Each rule: { maxWidth?, maxHeight?, quality?, smartSubsample?,
- *                generateAvif?, optimizePng? }.
  */
 export async function optimizeImages(config) {
   const {
     sourceDir,
-    thumbDir,
+    thumbDir = null,
     defaultQuality = 75,
     defaultMaxSize = 1200,
     thumbSize = 400,
@@ -109,5 +108,4 @@ export async function optimizeImages(config) {
   }
 
   await processDir(sourceDir);
-  console.log('\nDone.');
 }

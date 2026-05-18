@@ -32,12 +32,14 @@
   },
   "exports": {
     ".": "./src/index.ts",
+    "./config": "./modules/config/src/index.ts",
     "./blog": "./modules/blog/src/index.ts",
     "./blog/components": "./modules/blog/src/components/index.ts",
     "./seo": "./modules/seo/src/index.ts",
     "./seo/schema": "./modules/seo/src/schema.ts",
     "./seo/sitemap": "./modules/seo/src/sitemap.ts",
     "./images": "./modules/images/src/index.ts",
+    "./llms": "./modules/llms/src/generate.mjs",
     "./package.json": "./package.json"
   },
   "bin": {
@@ -60,6 +62,12 @@
   },
   "peerDependencies": {
     "astro": ">=5.0.0"
+  },
+  "peerDependenciesMeta": {
+    "astro": { "optional": true }
+  },
+  "optionalDependencies": {
+    "jiti": "^2.0.0"
   },
   "dependencies": {
     "gray-matter": "^4.0.3",
