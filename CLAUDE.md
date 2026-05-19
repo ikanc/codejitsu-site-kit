@@ -10,6 +10,10 @@ Shared core for every Codejitsu site. When the user invokes a module by name (e.
 4. If the module has a `templates/` directory, copy those files into the site at the locations the module's CLAUDE.md specifies. Adapt templates for the site's brand and content.
 5. After the change, walk through the module's `checklist.md` plus `checklist/core.md` (sitewide). Run `npx codejitsu-check` from the site root.
 
+## How to act on a SETUP request
+
+If the user asks to **set up codejitsu**, **init**, **migrate \<site\> to codejitsu**, or **start a new Codejitsu site** — open `node_modules/@ibalzam/codejitsu-core/SETUP.md` and follow the step-by-step playbook. It covers detection, install, config generation, module wiring, deploy, and verify for both greenfield and migration scenarios.
+
 ## Module subpaths
 
 | Subpath | Provides |

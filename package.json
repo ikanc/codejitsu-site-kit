@@ -79,8 +79,10 @@
     "src",
     "modules",
     "checklist",
+    "bin",
     "MIGRATIONS",
     "CLAUDE.md",
+    "SETUP.md",
     "README.md",
     "LICENSE"
   ],
