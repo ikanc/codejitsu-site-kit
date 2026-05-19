@@ -198,6 +198,12 @@ async function generateContentScan({ config, cwd }) {
   const llms = config.llms;
   const scan = llms.contentScan ?? {};
 
+  // Date + draft field names come from the blog module config; CC schemas like
+  // pearl's use `pubDate` + `draft`, while simpler sites use `date` (+ no draft).
+  const blogCfg = config.blog && typeof config.blog === 'object' ? config.blog : {};
+  const dateField = blogCfg.dateField ?? 'date';
+  const draftField = blogCfg.draftField ?? null;
+
   const servicesDir = scan.servicesDir ? path.resolve(cwd, scan.servicesDir) : null;
   const locationsDir = scan.locationsDir ? path.resolve(cwd, scan.locationsDir) : null;
   const pagesDir = scan.pagesDir ? path.resolve(cwd, scan.pagesDir) : null;
@@ -205,10 +211,7 @@ async function generateContentScan({ config, cwd }) {
 
   const services = readContentDir(servicesDir);
   const locations = readContentDir(locationsDir);
-  const blogPosts = readBlogPosts(blogDir, 'pubDate', 'draft').concat(
-    // Also try 'date' field for fallback
-    blogDir && readBlogPosts(blogDir, 'date', 'draft').filter((p) => !p.pubDate) || []
-  );
+  const blogPosts = readBlogPosts(blogDir, dateField, draftField);
   const pages = pagesDir ? collectStaticPages(pagesDir) : [];
 
   const dynamicRoutes = scan.dynamicRoutes ?? [];
@@ -239,6 +242,7 @@ async function generateContentScan({ config, cwd }) {
     business: site.business,
     services,
     locations,
+    blogPosts: blogPosts.slice(0, llms.blogFullLimit ?? 20),
     aiGuidance: llms.aiGuidance,
     today: isoDate(),
   });
@@ -372,7 +376,7 @@ function renderContentScanConcise({ siteUrl, siteName, tagline, about, business,
   return lines.join('\n') + '\n';
 }
 
-function renderContentScanFull({ siteUrl, siteName, tagline, about, business, services, locations, aiGuidance, today }) {
+function renderContentScanFull({ siteUrl, siteName, tagline, about, business, services, locations, blogPosts, aiGuidance, today }) {
   const lines = [];
   lines.push(`# ${siteName} — Full Reference`);
   lines.push(`Last Updated: ${today}`, '');
@@ -429,6 +433,19 @@ function renderContentScanFull({ siteUrl, siteName, tagline, about, business, se
     lines.push('## Service Areas', '');
     for (const area of business.areaServed) lines.push(`- ${area}`);
     lines.push('', '---', '');
+  }
+
+  if (blogPosts && blogPosts.length) {
+    lines.push('## Blog Posts', '');
+    for (const post of blogPosts) {
+      lines.push(`### ${post.title}`, '');
+      if (post.date) lines.push(`**Published**: ${post.date}`);
+      if (post.author) lines.push(`**Author**: ${post.author}`);
+      if (post.tags?.length) lines.push(`**Tags**: ${post.tags.join(', ')}`);
+      lines.push(`**URL**: ${siteUrl}/blog/${post.slug}/`, '');
+      if (post.description) lines.push(post.description, '');
+      lines.push('---', '');
+    }
   }
 
   lines.push(`## Optional`, '', `- Sitemap: ${siteUrl}/sitemap-index.xml`, '');

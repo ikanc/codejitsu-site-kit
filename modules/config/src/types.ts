@@ -15,7 +15,30 @@ export interface CodejitsuConfig {
   images?: ImagesConfig | false;
   llms?: LlmsConfig | false;
   deploy?: DeployConfig | false;
+  audit?: AuditConfig;
 }
+
+export interface AuditConfig {
+  /** Per-provider requirement. 'optional' = pass either way; 'required' = fail if absent; 'banned' = fail if present. */
+  analytics?: {
+    ga4?: AuditRequirement;
+    gtm?: AuditRequirement;
+    googleAds?: AuditRequirement;
+    ahrefs?: AuditRequirement;
+    hotjar?: AuditRequirement;
+  };
+  /** Site verification meta tags. true = required, false/missing = optional. */
+  verification?: {
+    googleSearchConsole?: boolean;
+    bingWebmaster?: boolean;
+  };
+  forms?: {
+    requireSpamProtection?: boolean;
+    requireConsent?: boolean;
+  };
+}
+
+export type AuditRequirement = 'required' | 'optional' | 'banned';
 
 export interface SiteConfig {
   /** Absolute site URL, no trailing slash. e.g. 'https://example.com'. */

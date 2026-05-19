@@ -60,6 +60,7 @@
       "default": "./modules/seo/src/sitemap.js"
     },
     "./seo/Head.astro": "./modules/seo/templates/Head.astro",
+    "./rehype/trailing-slash": "./modules/rehype/src/trailing-slash.mjs",
     "./images": {
       "types": "./modules/images/src/index.d.ts",
       "default": "./modules/images/src/index.js"
