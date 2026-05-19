@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { parseArgs } from 'node:util';
 import { runBlog } from '../modules/cli/src/blog.mjs';
+import { runDeploySetup } from '../modules/cli/src/deploy.mjs';
 import { runAudit } from '../modules/audit/src/run.mjs';
 
 const subcommand = process.argv[2];
@@ -9,6 +10,7 @@ const rest = process.argv.slice(3);
 const COMMANDS = {
   'blog:list': () => runBlog('blog:list'),
   'blog:drafts': () => runBlog('blog:drafts'),
+  'deploy:setup': () => runDeploySetup(),
   audit: () => {
     const { values } = parseArgs({
       args: rest,
@@ -51,6 +53,8 @@ function printHelp() {
   console.log(`Subcommands:`);
   console.log(`  blog:list           List every non-draft post with URL + image check`);
   console.log(`  blog:drafts         List future-dated (pending) posts only`);
+  console.log(``);
+  console.log(`  deploy:setup        Wire up daily Cloudflare deploy (prompts for hook URL)`);
   console.log(``);
   console.log(`  audit               Run pre-delivery audit. Flags:`);
   console.log(`    --live <url>      Add live-URL checks (SSL, headers, 404, broken links)`);
