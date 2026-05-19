@@ -68,6 +68,7 @@
     "./package.json": "./package.json"
   },
   "bin": {
+    "codejitsu": "./bin/codejitsu.mjs",
     "codejitsu-llms": "./modules/llms/bin/generate.mjs",
     "codejitsu-optimize-images": "./modules/images/bin/optimize.mjs",
     "codejitsu-check": "./checklist/bin/run.mjs"
