@@ -1,3 +1,9 @@
+// @ts-expect-error - 'astro:content' is a virtual module resolved by Astro at build time.
+// Static import (not dynamic) so Vite/Astro processes the dependency correctly.
+// This file is only safe to import from inside an Astro project. It lives at the
+// `/blog/collection` subpath; sites that aren't Astro should import from `/blog`
+// (which doesn't pull this in).
+import { getCollection as astroGetCollection } from 'astro:content';
 import readingTime from 'reading-time';
 import type {
   BlogCategory,
@@ -33,29 +39,15 @@ function asDate(value: unknown): Date | null {
 }
 
 /**
- * Astro Content Collections blog loader. Use this in Astro projects.
+ * Astro Content Collections blog loader. Use in any Astro project.
  *
- * Returns raw CollectionEntry objects (preserving `entry.data`, `entry.id`,
- * and the ability to call `render(entry)` from astro:content). Filtering and
- * sorting are applied:
- *   - Drafts excluded (when `draftField` is set)
- *   - Sorted newest first by `dateField`
- *   - `getPublishedEntries()` further excludes future-dated entries
+ * Returns raw CollectionEntry objects with filtering applied (drafts excluded,
+ * sorted newest first by `dateField`). Preserves `entry.data`, `entry.id`,
+ * and the ability to call `render(entry)` for `<Content />`.
  *
- * The collection's actual entry type is `CollectionEntry<'<name>'>` from
- * `astro:content`. Pass it as the generic to get full typed `data`:
- *
- * ```ts
- * import type { CollectionEntry } from 'astro:content';
- * export const blog = createBlogFromCollection<CollectionEntry<'blog'>>({
- *   collectionName: 'blog',
- *   dateField: 'pubDate',
- *   draftField: 'draft',
- * });
- * ```
- *
- * Dynamically imports `astro:content` at call time so the package stays
- * usable in non-Astro projects.
+ * Import only from inside Astro code (`src/lib/blog.ts`, page routes). Do not
+ * import from `astro.config.mjs` — Astro CC isn't initialized at config time.
+ * Use `createBlog` (fs) for astro.config.
  */
 export function createBlogFromCollection<E extends BlogCollectionEntry = BlogCollectionEntry>(
   config: CollectionBlogConfig = {}
@@ -66,22 +58,8 @@ export function createBlogFromCollection<E extends BlogCollectionEntry = BlogCol
   const dateField = config.dateField ?? 'date';
   const draftField = config.draftField ?? null;
 
-  async function getCollection(): Promise<E[]> {
-    let mod: { getCollection: (name: string) => Promise<E[]> };
-    try {
-      // @ts-expect-error - 'astro:content' is a virtual module resolved by Astro at build time.
-      mod = await import('astro:content');
-    } catch (err) {
-      throw new Error(
-        `createBlogFromCollection() requires Astro and a configured content collection ` +
-          `named '${collectionName}'. Original error: ${err instanceof Error ? err.message : String(err)}`
-      );
-    }
-    return mod.getCollection(collectionName);
-  }
-
   async function readAll(): Promise<E[]> {
-    const all = await getCollection();
+    const all = (await astroGetCollection(collectionName)) as E[];
     const filtered = draftField ? all.filter((e) => !e.data[draftField]) : all;
     return filtered.sort((a, b) => {
       const da = asDate(a.data[dateField])?.valueOf() ?? 0;

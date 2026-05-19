@@ -43,6 +43,10 @@
       "types": "./modules/blog/src/index.d.ts",
       "default": "./modules/blog/src/index.js"
     },
+    "./blog/collection": {
+      "types": "./modules/blog/src/collection.d.ts",
+      "default": "./modules/blog/src/collection.js"
+    },
     "./seo": {
       "types": "./modules/seo/src/index.d.ts",
       "default": "./modules/seo/src/index.js"
