@@ -1,32 +1,53 @@
 # Blog module — instructions for Claude
 
-When the user asks to **implement codejitsu/core/blog** (or "add the blog system", "wire up the blog"), do the following.
+When the user asks to **implement codejitsu/core/blog** (or "add the blog system"), do the following.
 
 ## What this module provides
 
-A markdown blog with two loader variants — pick whichever fits the project:
+Two loader variants:
 
-- **`createBlogFromCollection`** — uses Astro Content Collections. **Use this for any Astro site.** Type-safe via the collection's Zod schema, schema-validated, HMR works.
-- **`createBlog`** — reads `content/blog/*.md` via gray-matter directly. Use for non-Astro projects or when CC isn't an option.
+- **`createBlogFromCollection`** — wraps Astro Content Collections. **Use this for any Astro site.** Returns raw `CollectionEntry` objects with filtering applied, preserving `entry.data`, `entry.id`, and the ability to call `render(entry)` for `<Content />`.
+- **`createBlog`** — fs + gray-matter loader. Use for non-Astro projects. Returns normalized `BlogPostMetadata` / `BlogPost` objects.
 
-Both variants return the same `BlogAPI`:
+The two return **different shapes** because they serve different needs:
+
+| | CC (`createBlogFromCollection`) | fs (`createBlog`) |
+|---|---|---|
+| Returns | `CollectionEntry[]` | `BlogPostMetadata[]` |
+| Access | `entry.data.title`, `entry.id`, `await render(entry)` | `post.title`, `post.slug`, `post.content` (raw md) |
+| Validation | Astro CC schema (Zod) | Frontmatter parsed by gray-matter, no validation |
+| HMR | Yes (Astro) | No |
+| Filter applied | draft + future-date | draft + future-date |
+| Sort | newest first | newest first |
+| Best for | Astro sites (most cases) | Non-Astro JS projects |
+
+## CC variant API
 
 ```ts
-getAllPosts()                  // Published posts (date <= today, not draft). Sorted newest first.
-getAllPostsIncludingFuture()   // All non-draft posts.
-getFutureBlogSlugs()           // Slugs of future-dated drafts (for sitemap exclusion).
-getAllPostSlugs()              // Every slug for getStaticPaths (includes future, excludes drafts).
-getPostBySlug(slug)            // Resolves filename-slug OR canonical (frontmatter) slug.
-getAllTags() / getPostsByTag(tag)
-getAllCategorySlugs() / getCategoryBySlug(slug) / getPostsByCategory(slug)
+const blog = createBlogFromCollection({
+  collectionName: 'blog',
+  dateField: 'pubDate',         // matches your CC schema field
+  draftField: 'draft',
+});
+
+await blog.getPublishedEntries();    // CollectionEntry[] — not draft, date <= today
+await blog.getAllEntries();          // CollectionEntry[] — not draft (includes future)
+await blog.getEntryBySlug(slug);     // CollectionEntry | null
+await blog.getFutureBlogSlugs();     // string[] — for sitemap exclusion
+await blog.getAllPostSlugs();        // string[] — for getStaticPaths
+await blog.getEntriesByTag(tag);     // CollectionEntry[]
+await blog.getAllTags();             // string[]
+await blog.getEntriesByCategory(s);  // CollectionEntry[]
+blog.toMetadata(entry);              // BlogPostMetadata — normalized derivation
 ```
 
 ## Wiring into an Astro site
 
 ### 1. Set up the Content Collection
 
+`src/content.config.ts`:
+
 ```ts
-// src/content.config.ts
 import { defineCollection, z } from 'astro:content';
 import { glob } from 'astro/loaders';
 
@@ -35,7 +56,7 @@ const blog = defineCollection({
   schema: z.object({
     title: z.string(),
     description: z.string(),
-    pubDate: z.coerce.date(),      // ← date field; configure dateField to match
+    pubDate: z.coerce.date(),
     updatedDate: z.coerce.date().optional(),
     author: z.string().default('editor'),
     image: z.string().optional(),
@@ -54,32 +75,30 @@ export const collections = { blog };
 ### 2. Configure in `codejitsu.config.ts`
 
 ```ts
-import { defineConfig } from '@ibalzam/codejitsu-core/config';
-
-export default defineConfig({
-  site: { url: '...', name: '...', defaultAuthor: 'editor' },
-  blog: {
-    mode: 'collection',
-    collectionName: 'blog',
-    dateField: 'pubDate',          // matches the CC schema field
-    draftField: 'draft',
-    // categories: [...]            // optional
-  },
-});
-```
-
-### 3. Create the loader
-
-```ts
-// src/lib/blog.ts
-import { createBlogFromCollection } from '@ibalzam/codejitsu-core/blog';
-
-export const blog = createBlogFromCollection({
+blog: {
+  mode: 'collection',
   collectionName: 'blog',
   dateField: 'pubDate',
   draftField: 'draft',
-  defaultAuthor: 'editor',
+},
+```
+
+### 3. Create the loader instance
+
+```ts
+// src/lib/blog.ts
+import type { CollectionEntry } from 'astro:content';
+import { createBlogFromCollection } from '@ibalzam/codejitsu-core/blog';
+
+export const blog = createBlogFromCollection<CollectionEntry<'blog'>>({
+  collectionName: 'blog',
+  dateField: 'pubDate',
+  draftField: 'draft',
 });
+
+// Backward-compat exports for sites migrating from a homegrown loader:
+export const getPublishedPosts = () => blog.getPublishedEntries();
+export const getAllPosts = () => blog.getAllEntries();
 ```
 
 ### 4. Use in pages
@@ -87,27 +106,36 @@ export const blog = createBlogFromCollection({
 ```astro
 ---
 // src/pages/blog/[slug].astro
+import { render } from 'astro:content';
 import { blog } from '~/lib/blog';
 
 export async function getStaticPaths() {
-  const slugs = await blog.getAllPostSlugs();  // includes future-dated for OG scrapers
-  return slugs.map((slug) => ({ params: { slug } }));
+  const entries = await blog.getAllEntries();  // includes future-dated for OG scrapers
+  return entries.map((entry) => ({
+    params: { slug: entry.id },
+    props: { entry },
+  }));
 }
 
-const post = await blog.getPostBySlug(Astro.params.slug as string);
-if (!post) return Astro.redirect('/404');
+const { entry } = Astro.props;
+const { Content } = await render(entry);
 ---
+<article>
+  <h1>{entry.data.title}</h1>
+  <Content />
+</article>
 ```
 
 ### 5. Wire scheduled-post filter into the sitemap
 
-In `astro.config.mjs`, get future slugs from the blog instance and pass to the sitemap's `excludeFuturePosts` filter:
-
 ```ts
-import { blog } from './src/lib/blog';
-import { excludeFuturePosts, defaultPriorityRules } from '@ibalzam/codejitsu-core/seo/sitemap';
+// astro.config.mjs
+import { createBlog } from '@ibalzam/codejitsu-core/blog';
+import { excludeFuturePosts, defaultPriorityRules } from '@ibalzam/codejitsu-core/seo';
 
-const futureSlugs = await blog.getFutureBlogSlugs();
+// Use the fs loader here — astro.config runs before Astro's CC is initialized.
+const fsBlog = createBlog({ contentDir: 'src/content/blog', dateField: 'pubDate', draftField: 'draft' });
+const futureSlugs = await fsBlog.getFutureBlogSlugs();
 
 sitemap({
   filter: excludeFuturePosts(futureSlugs),
@@ -115,25 +143,13 @@ sitemap({
 });
 ```
 
-## Frontmatter shape
-
-Required: `title`, `description`, date (default field name `date`, configurable via `dateField`).
-Recommended: `image`, `tags`, `author`.
-Optional: `slug` (canonical override), `faqs`, `draft`, `updatedDate`.
-
-Field names are flexible — set `dateField` and `draftField` in your CC schema and they'll flow through.
-
-## Dual-slug behavior
-
-If a post's frontmatter has `slug: 'short-form'` and its filename is `2026-02-08-long-form.md`, **both URLs resolve to the same post** but `slug` (frontmatter) is canonical. This lets you ship short URLs while keeping date-prefixed URLs alive. Set `<link rel="canonical">` to the frontmatter slug.
-
 ## What must NOT be done
 
-- **Don't use `createBlog` (fs mode) in an Astro project.** You lose schema validation, HMR, type safety. Always prefer `createBlogFromCollection`.
-- **Don't bypass `getAllPosts()` for the listing.** It filters future-dated and drafts; bypassing leaks drafts.
-- **Don't use `getAllPosts()` for `getStaticPaths`** — use `getAllPostSlugs()` so future-dated posts stay buildable (OG scrapers need to reach them before publish day).
-- **Don't read the collection directly** (e.g. `await getCollection('blog')`) in pages. Use the `blog` instance from `src/lib/blog.ts` so filtering/sorting/date logic stays in one place.
-- **Don't change `dateField` mid-project** without renaming the frontmatter field in every existing post.
+- **Don't use `createBlog` (fs) inside Astro pages.** You lose Astro's `render()` (needed for `<Content />`) and CC schema validation. Always prefer `createBlogFromCollection` in pages.
+- **Don't access raw `getCollection('blog')` directly.** Go through the blog instance from `src/lib/blog.ts` so filtering/sorting/date logic stays in one place.
+- **Don't use `getPublishedEntries()` for `getStaticPaths`** — use `getAllEntries()` so future-dated posts stay buildable (OG scrapers need to reach them before publish day).
+- **Don't change `dateField` mid-project** without renaming the frontmatter field in every existing post AND updating the CC schema field name to match.
+- **Don't rely on the CC variant's filtering for security.** A draft post's URL is still discoverable if anyone shares it. Use middleware/headers for true access control.
 
 ## Verify
 

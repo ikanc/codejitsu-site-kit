@@ -1,8 +1,8 @@
 import readingTime from 'reading-time';
 import type {
-  BlogAPI,
   BlogCategory,
-  BlogPost,
+  BlogCollectionAPI,
+  BlogCollectionEntry,
   BlogPostMetadata,
   CommonBlogConfig,
 } from './types.js';
@@ -10,14 +10,6 @@ import type {
 export interface CollectionBlogConfig extends CommonBlogConfig {
   /** Astro Content Collection name. Default 'blog'. */
   collectionName?: string;
-}
-
-/** Minimal shape of an Astro CollectionEntry that we depend on. */
-interface AstroCollectionEntry {
-  id: string;
-  slug: string;
-  data: Record<string, unknown>;
-  body: string;
 }
 
 function getTodayUTC(): Date {
@@ -31,118 +23,123 @@ function asISO(value: unknown): string {
   return '';
 }
 
+function asDate(value: unknown): Date | null {
+  if (value instanceof Date) return value;
+  if (typeof value === 'string') {
+    const d = new Date(value);
+    return Number.isNaN(d.valueOf()) ? null : d;
+  }
+  return null;
+}
+
 /**
  * Astro Content Collections blog loader. Use this in Astro projects.
  *
- * Dynamically imports `astro:content` at call time so the rest of this package
- * stays usable in non-Astro environments. Throws a clear error if Astro is missing.
+ * Returns raw CollectionEntry objects (preserving `entry.data`, `entry.id`,
+ * and the ability to call `render(entry)` from astro:content). Filtering and
+ * sorting are applied:
+ *   - Drafts excluded (when `draftField` is set)
+ *   - Sorted newest first by `dateField`
+ *   - `getPublishedEntries()` further excludes future-dated entries
+ *
+ * The collection's actual entry type is `CollectionEntry<'<name>'>` from
+ * `astro:content`. Pass it as the generic to get full typed `data`:
+ *
+ * ```ts
+ * import type { CollectionEntry } from 'astro:content';
+ * export const blog = createBlogFromCollection<CollectionEntry<'blog'>>({
+ *   collectionName: 'blog',
+ *   dateField: 'pubDate',
+ *   draftField: 'draft',
+ * });
+ * ```
+ *
+ * Dynamically imports `astro:content` at call time so the package stays
+ * usable in non-Astro projects.
  */
-export function createBlogFromCollection(config: CollectionBlogConfig = {}): BlogAPI {
+export function createBlogFromCollection<E extends BlogCollectionEntry = BlogCollectionEntry>(
+  config: CollectionBlogConfig = {}
+): BlogCollectionAPI<E> {
   const collectionName = config.collectionName ?? 'blog';
   const defaultAuthor = config.defaultAuthor;
   const categories = config.categories ?? [];
   const dateField = config.dateField ?? 'date';
   const draftField = config.draftField ?? null;
 
-  async function getCollection(): Promise<AstroCollectionEntry[]> {
-    let mod: { getCollection: (name: string) => Promise<AstroCollectionEntry[]> };
+  async function getCollection(): Promise<E[]> {
+    let mod: { getCollection: (name: string) => Promise<E[]> };
     try {
       // @ts-expect-error - 'astro:content' is a virtual module resolved by Astro at build time.
       mod = await import('astro:content');
     } catch (err) {
       throw new Error(
         `createBlogFromCollection() requires Astro and a configured content collection ` +
-          `named '${collectionName}'. Add Astro to the project or use createBlog() (fs+gray-matter) instead. ` +
-          `Original error: ${err instanceof Error ? err.message : String(err)}`
+          `named '${collectionName}'. Original error: ${err instanceof Error ? err.message : String(err)}`
       );
     }
     return mod.getCollection(collectionName);
   }
 
-  async function readAll(): Promise<AstroCollectionEntry[]> {
+  async function readAll(): Promise<E[]> {
     const all = await getCollection();
-    if (!draftField) return all;
-    return all.filter((e) => !e.data[draftField]);
+    const filtered = draftField ? all.filter((e) => !e.data[draftField]) : all;
+    return filtered.sort((a, b) => {
+      const da = asDate(a.data[dateField])?.valueOf() ?? 0;
+      const db = asDate(b.data[dateField])?.valueOf() ?? 0;
+      return db - da;
+    });
   }
 
-  function toMetadata(e: AstroCollectionEntry): BlogPostMetadata {
-    const canonicalSlug = (e.data.slug as string | undefined) || e.slug;
-    return {
-      slug: canonicalSlug,
-      title: (e.data.title as string) ?? '',
-      description: (e.data.description as string) ?? '',
-      date: asISO(e.data[dateField]),
-      author: (e.data.author as string) ?? defaultAuthor,
-      image: e.data.image as string | undefined,
-      tags: e.data.tags as string[] | undefined,
-      readingTime: readingTime(e.body).text,
-    };
+  async function getAllEntries(): Promise<E[]> {
+    return readAll();
   }
 
-  async function getAllPostsIncludingFuture(): Promise<BlogPostMetadata[]> {
-    const entries = await readAll();
-    return entries
-      .map(toMetadata)
-      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }
-
-  async function getAllPosts(): Promise<BlogPostMetadata[]> {
+  async function getPublishedEntries(): Promise<E[]> {
     const today = getTodayUTC();
-    const all = await getAllPostsIncludingFuture();
-    return all.filter((p) => new Date(p.date) <= today);
+    const all = await readAll();
+    return all.filter((e) => {
+      const d = asDate(e.data[dateField]);
+      return d ? d <= today : true;
+    });
   }
 
   async function getFutureBlogSlugs(): Promise<string[]> {
     const today = getTodayUTC();
-    const entries = await readAll();
-    const slugs = new Set<string>();
-    for (const e of entries) {
-      const date = asISO(e.data[dateField]);
-      if (!date) continue;
-      if (new Date(date) > today) {
-        const canonical = (e.data.slug as string | undefined) || e.slug;
-        slugs.add(canonical);
-        if (e.slug !== canonical) slugs.add(e.slug);
-      }
-    }
-    return Array.from(slugs);
+    const all = await readAll();
+    return all
+      .filter((e) => {
+        const d = asDate(e.data[dateField]);
+        return d ? d > today : false;
+      })
+      .map((e) => e.id);
   }
 
   async function getAllPostSlugs(): Promise<string[]> {
-    const entries = await readAll();
-    const slugs = new Set<string>();
-    for (const e of entries) {
-      slugs.add(e.slug);
-      const canonical = (e.data.slug as string | undefined) || e.slug;
-      if (canonical !== e.slug) slugs.add(canonical);
-    }
-    return Array.from(slugs);
+    const all = await readAll();
+    return all.map((e) => e.id);
   }
 
-  async function getPostBySlug(slug: string): Promise<BlogPost | null> {
-    const entries = await readAll();
-    const match = entries.find((e) => {
-      const canonical = (e.data.slug as string | undefined) || e.slug;
-      return canonical === slug || e.slug === slug;
-    });
-    if (!match) return null;
-    return {
-      ...toMetadata(match),
-      faqs: match.data.faqs as BlogPost['faqs'],
-      content: match.body,
-    };
+  async function getEntryBySlug(slug: string): Promise<E | null> {
+    const all = await readAll();
+    return all.find((e) => e.id === slug) ?? null;
   }
 
   async function getAllTags(): Promise<string[]> {
-    const posts = await getAllPosts();
+    const entries = await getPublishedEntries();
     const tags = new Set<string>();
-    posts.forEach((p) => p.tags?.forEach((t) => tags.add(t)));
+    entries.forEach((e) => {
+      const t = e.data.tags as string[] | undefined;
+      t?.forEach((tag) => tags.add(tag));
+    });
     return Array.from(tags).sort();
   }
 
-  async function getPostsByTag(tag: string): Promise<BlogPostMetadata[]> {
-    const posts = await getAllPosts();
-    return posts.filter((p) => p.tags?.includes(tag));
+  async function getEntriesByTag(tag: string): Promise<E[]> {
+    const entries = await getPublishedEntries();
+    return entries.filter((e) => {
+      const t = e.data.tags as string[] | undefined;
+      return t?.includes(tag);
+    });
   }
 
   function getAllCategorySlugs(): string[] {
@@ -153,24 +150,37 @@ export function createBlogFromCollection(config: CollectionBlogConfig = {}): Blo
     return categories.find((c) => c.slug === slug);
   }
 
-  async function getPostsByCategory(slug: string): Promise<BlogPostMetadata[]> {
+  async function getEntriesByCategory(slug: string): Promise<E[]> {
     const cat = getCategoryBySlug(slug);
     if (!cat) return [];
-    const posts = await getAllPosts();
-    return posts.filter((p) => p.tags?.includes(cat.tag));
+    return getEntriesByTag(cat.tag);
+  }
+
+  function toMetadata(entry: E): BlogPostMetadata {
+    return {
+      slug: entry.id,
+      title: (entry.data.title as string) ?? '',
+      description: (entry.data.description as string) ?? '',
+      date: asISO(entry.data[dateField]),
+      author: (entry.data.author as string) ?? defaultAuthor,
+      image: entry.data.image as string | undefined,
+      tags: entry.data.tags as string[] | undefined,
+      readingTime: readingTime(entry.body).text,
+    };
   }
 
   return {
-    getAllPosts,
-    getAllPostsIncludingFuture,
+    getPublishedEntries,
+    getAllEntries,
     getFutureBlogSlugs,
     getAllPostSlugs,
-    getPostBySlug,
+    getEntryBySlug,
     getAllTags,
-    getPostsByTag,
+    getEntriesByTag,
     getAllCategorySlugs,
     getCategoryBySlug,
-    getPostsByCategory,
+    getEntriesByCategory,
+    toMetadata,
     categories,
   };
 }

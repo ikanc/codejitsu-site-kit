@@ -3,7 +3,7 @@ import path from 'path';
 import matter from 'gray-matter';
 import readingTime from 'reading-time';
 import type {
-  BlogAPI,
+  BlogFsAPI,
   BlogCategory,
   BlogPost,
   BlogPostMetadata,
@@ -36,7 +36,7 @@ function asISO(value: unknown): string {
  *
  * For Astro projects with Content Collections (recommended), use `createBlogFromCollection`.
  */
-export function createBlog(config: FsBlogConfig = {}): BlogAPI {
+export function createBlog(config: FsBlogConfig = {}): BlogFsAPI {
   const contentDir = path.resolve(process.cwd(), config.contentDir ?? 'content/blog');
   const defaultAuthor = config.defaultAuthor;
   const categories = config.categories ?? [];
