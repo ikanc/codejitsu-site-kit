@@ -1,0 +1,420 @@
+---
+/**
+ * Codejitsu contact modal.
+ *
+ * Drop one instance into a layout that wraps every page (e.g. BaseLayout).
+ * Trigger from anywhere with:
+ *
+ *   <button data-codejitsu-contact-trigger>Get a quote</button>
+ *
+ * On success: dispatches a `codejitsu-contact-submitted` custom event on
+ * `window`. Sites add their own listener for analytics (GA4 conversion,
+ * Google Ads, etc.) so this component stays generic.
+ *
+ * Theming via CSS variables (set on `:root` in your global CSS):
+ *   --codejitsu-modal-accent          (focus ring + button bg; default #2563eb)
+ *   --codejitsu-modal-accent-hover    (default #1d4ed8)
+ *   --codejitsu-modal-on-accent       (text on button; default #ffffff)
+ */
+
+interface FieldProps {
+  enabled?: boolean;
+  required?: boolean;
+  label?: string;
+  placeholder?: string;
+}
+
+interface Props {
+  /** Unique id (lets multiple modals coexist if ever needed). Default 'codejitsu-contact'. */
+  id?: string;
+  title: string;
+  image?: {
+    src: string;
+    alt: string;
+    width?: number;
+    height?: number;
+  };
+  fields?: {
+    name?: FieldProps;
+    email?: FieldProps;
+    phone?: FieldProps;
+    message?: FieldProps;
+  };
+  submitText?: string;
+  thankYouMessage?: string;
+  emailjs: {
+    serviceId: string;
+    templateId: string;
+    publicKey: string;
+  };
+  recaptcha?: { siteKey: string };
+}
+
+const {
+  id = 'codejitsu-contact',
+  title,
+  image,
+  fields = {},
+  submitText = 'Send Message',
+  thankYouMessage = "Thanks! We'll get back to you shortly.",
+  emailjs,
+  recaptcha,
+} = Astro.props as Props;
+
+// Field defaults — all fields enabled, name+email+phone required, message optional.
+const f = {
+  name:    { enabled: true,  required: true,  label: 'Name',    placeholder: 'Your full name',          ...fields.name },
+  email:   { enabled: true,  required: true,  label: 'Email',   placeholder: 'you@email.com',           ...fields.email },
+  phone:   { enabled: true,  required: true,  label: 'Phone',   placeholder: '(xxx) xxx-xxxx',          ...fields.phone },
+  message: { enabled: true,  required: false, label: 'Message', placeholder: 'How can we help?',        ...fields.message },
+};
+
+const overlayId = `${id}-overlay`;
+const cardId = `${id}-card`;
+const closeId = `${id}-close`;
+const formId = `${id}-form`;
+const toastId = `${id}-toast`;
+const titleId = `${id}-title`;
+
+const config = {
+  serviceId: emailjs.serviceId,
+  templateId: emailjs.templateId,
+  publicKey: emailjs.publicKey,
+  recaptchaSiteKey: recaptcha?.siteKey ?? null,
+};
+---
+
+<div
+  id={overlayId}
+  class="cj-modal-overlay fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm opacity-0 pointer-events-none transition-opacity duration-300"
+  aria-hidden="true"
+  inert
+  role="dialog"
+  aria-modal="true"
+  aria-labelledby={titleId}
+>
+  <div
+    id={cardId}
+    class="bg-white rounded-2xl shadow-2xl w-full max-w-3xl mx-4 max-h-[90vh] overflow-y-auto p-6 sm:p-8 transform scale-95 transition-transform duration-300"
+  >
+    <div class="flex items-center justify-between mb-4">
+      <h2 id={titleId} class="text-xl font-bold text-gray-900">{title}</h2>
+      <button
+        type="button"
+        id={closeId}
+        class="text-gray-400 hover:text-gray-700 transition-colors p-1"
+        aria-label="Close modal"
+      >
+        <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path>
+        </svg>
+      </button>
+    </div>
+
+    <div class={image ? 'flex flex-col md:flex-row gap-6' : ''}>
+      {image && (
+        <div class="hidden md:block md:w-1/2 shrink-0">
+          <img
+            src={image.src}
+            alt={image.alt}
+            width={image.width ?? 600}
+            height={image.height ?? 600}
+            class="w-full h-full rounded-xl object-cover"
+            loading="lazy"
+          />
+        </div>
+      )}
+
+      <div class="flex-1">
+        <form id={formId} class="cj-emailjs-form space-y-4" novalidate>
+          {f.name.enabled && (
+            <div>
+              <label for={`${id}-name`} class="block text-sm font-medium text-gray-700 mb-1">
+                {f.name.label}{f.name.required && <span class="text-red-500"> *</span>}
+              </label>
+              <input
+                type="text"
+                id={`${id}-name`}
+                name="name"
+                required={f.name.required}
+                autocomplete="name"
+                class="cj-modal-input w-full border border-gray-300 rounded-lg px-4 py-2.5 text-gray-900 outline-none transition-shadow"
+                placeholder={f.name.placeholder}
+              />
+            </div>
+          )}
+
+          {f.email.enabled && (
+            <div>
+              <label for={`${id}-email`} class="block text-sm font-medium text-gray-700 mb-1">
+                {f.email.label}{f.email.required && <span class="text-red-500"> *</span>}
+              </label>
+              <input
+                type="email"
+                id={`${id}-email`}
+                name="email"
+                required={f.email.required}
+                autocomplete="email"
+                class="cj-modal-input w-full border border-gray-300 rounded-lg px-4 py-2.5 text-gray-900 outline-none transition-shadow"
+                placeholder={f.email.placeholder}
+              />
+            </div>
+          )}
+
+          {f.phone.enabled && (
+            <div>
+              <label for={`${id}-phone`} class="block text-sm font-medium text-gray-700 mb-1">
+                {f.phone.label}{f.phone.required && <span class="text-red-500"> *</span>}
+              </label>
+              <input
+                type="tel"
+                id={`${id}-phone`}
+                name="phone"
+                required={f.phone.required}
+                autocomplete="tel"
+                class="cj-modal-input w-full border border-gray-300 rounded-lg px-4 py-2.5 text-gray-900 outline-none transition-shadow"
+                placeholder={f.phone.placeholder}
+              />
+            </div>
+          )}
+
+          {f.message.enabled && (
+            <div>
+              <label for={`${id}-message`} class="block text-sm font-medium text-gray-700 mb-1">
+                {f.message.label}{f.message.required && <span class="text-red-500"> *</span>}
+              </label>
+              <textarea
+                id={`${id}-message`}
+                name="message"
+                required={f.message.required}
+                rows="3"
+                class="cj-modal-input w-full border border-gray-300 rounded-lg px-4 py-2.5 text-gray-900 outline-none transition-shadow resize-y"
+                placeholder={f.message.placeholder}
+              ></textarea>
+            </div>
+          )}
+
+          {/* Honeypot — bots fill this; humans don't see it */}
+          <div aria-hidden="true" style="position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden;">
+            <label for={`${id}-website`}>Website (leave blank)</label>
+            <input type="text" id={`${id}-website`} name="cj_hp_website" tabindex="-1" autocomplete="off" />
+          </div>
+
+          {recaptcha && (
+            <div class="g-recaptcha" data-sitekey={recaptcha.siteKey}></div>
+          )}
+
+          <button
+            type="submit"
+            class="cj-modal-submit w-full text-center font-semibold py-3 rounded-lg transition-colors"
+          >
+            {submitText}
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div
+  id={toastId}
+  class="cj-modal-toast fixed bottom-6 right-6 z-[110] bg-green-600 text-white px-6 py-3 rounded-lg shadow-lg transform translate-y-20 opacity-0 transition-all duration-300 pointer-events-none"
+  role="status"
+  aria-live="polite"
+>
+  {thankYouMessage}
+</div>
+
+<style is:global>
+  :root {
+    --codejitsu-modal-accent: #2563eb;
+    --codejitsu-modal-accent-hover: #1d4ed8;
+    --codejitsu-modal-on-accent: #ffffff;
+  }
+  .cj-modal-input:focus {
+    border-color: var(--codejitsu-modal-accent);
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--codejitsu-modal-accent) 25%, transparent);
+  }
+  .cj-modal-submit {
+    background-color: var(--codejitsu-modal-accent);
+    color: var(--codejitsu-modal-on-accent);
+  }
+  .cj-modal-submit:hover:not(:disabled) {
+    background-color: var(--codejitsu-modal-accent-hover);
+  }
+  .cj-modal-submit:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+</style>
+
+{recaptcha && (
+  <script is:inline src="https://www.google.com/recaptcha/api.js" async defer></script>
+)}
+
+<script is:inline src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+<script is:inline define:vars={{ modalId: id, cfg: config }}>
+  // Per-modal IDs (one modal per page expected; this scopes to its DOM).
+  const overlay = document.getElementById(modalId + '-overlay');
+  const card = document.getElementById(modalId + '-card');
+  const closeBtn = document.getElementById(modalId + '-close');
+  const form = document.getElementById(modalId + '-form');
+  const toast = document.getElementById(modalId + '-toast');
+
+  if (!overlay || !card || !form) {
+    // Modal not present on this page; bail silently.
+  } else {
+    // Initialise EmailJS once per page load.
+    function initEmailJS() {
+      if (window.emailjs && !window.__cjEmailjsInitialized) {
+        window.emailjs.init({ publicKey: cfg.publicKey });
+        window.__cjEmailjsInitialized = true;
+      }
+    }
+    initEmailJS();
+    document.addEventListener('DOMContentLoaded', initEmailJS);
+
+    let previouslyFocused = null;
+
+    function getFocusable() {
+      return Array.from(card.querySelectorAll(
+        'a[href], button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
+      ));
+    }
+
+    function open() {
+      previouslyFocused = document.activeElement;
+      overlay.classList.remove('opacity-0', 'pointer-events-none');
+      overlay.classList.add('opacity-100');
+      overlay.setAttribute('aria-hidden', 'false');
+      overlay.removeAttribute('inert');
+      card.classList.remove('scale-95');
+      card.classList.add('scale-100');
+      document.body.style.overflow = 'hidden';
+      setTimeout(function () {
+        const f = getFocusable();
+        if (f.length) f[0].focus();
+      }, 100);
+    }
+
+    function close() {
+      overlay.classList.add('opacity-0', 'pointer-events-none');
+      overlay.classList.remove('opacity-100');
+      overlay.setAttribute('aria-hidden', 'true');
+      overlay.setAttribute('inert', '');
+      card.classList.add('scale-95');
+      card.classList.remove('scale-100');
+      document.body.style.overflow = '';
+      if (previouslyFocused && previouslyFocused.focus) {
+        previouslyFocused.focus();
+        previouslyFocused = null;
+      }
+    }
+
+    function showToast() {
+      if (!toast) return;
+      toast.classList.remove('translate-y-20', 'opacity-0');
+      toast.classList.add('translate-y-0', 'opacity-100');
+      setTimeout(function () {
+        toast.classList.add('translate-y-20', 'opacity-0');
+        toast.classList.remove('translate-y-0', 'opacity-100');
+      }, 4000);
+    }
+
+    // Triggers: data-codejitsu-contact-trigger or data-codejitsu-contact-trigger="<id>".
+    document.addEventListener('click', function (e) {
+      const trigger = e.target.closest('[data-codejitsu-contact-trigger]');
+      if (trigger) {
+        const wanted = trigger.getAttribute('data-codejitsu-contact-trigger');
+        if (!wanted || wanted === modalId) {
+          e.preventDefault();
+          open();
+        }
+        return;
+      }
+      if (e.target.closest('#' + modalId + '-close')) {
+        close();
+        return;
+      }
+      if (e.target === overlay) close();
+    });
+
+    // Esc + focus trap.
+    document.addEventListener('keydown', function (e) {
+      if (overlay.classList.contains('pointer-events-none')) return;
+      if (e.key === 'Escape') { close(); return; }
+      if (e.key === 'Tab') {
+        const f = getFocusable();
+        if (!f.length) return;
+        const first = f[0], last = f[f.length - 1];
+        if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+        else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+      }
+    });
+
+    // Submit handler.
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+
+      // Honeypot
+      const hp = form.querySelector('input[name="cj_hp_website"]');
+      if (hp && hp.value) {
+        // Bot detected — pretend success, don't actually send.
+        form.reset();
+        close();
+        showToast();
+        return;
+      }
+
+      if (!form.checkValidity()) {
+        form.reportValidity();
+        return;
+      }
+
+      if (cfg.recaptchaSiteKey) {
+        const captchaResponse = form.querySelector('textarea[name="g-recaptcha-response"]');
+        if (!captchaResponse || !captchaResponse.value) {
+          alert('Please complete the reCAPTCHA before submitting.');
+          return;
+        }
+      }
+
+      initEmailJS();
+      if (!window.emailjs) {
+        console.error('[codejitsu-contact] EmailJS SDK not loaded');
+        return;
+      }
+
+      const submitBtn = form.querySelector('button[type="submit"]');
+      const originalText = submitBtn ? submitBtn.textContent : '';
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Sending…';
+      }
+
+      window.emailjs.sendForm(cfg.serviceId, cfg.templateId, form).then(function () {
+        // Fire custom event for site-side analytics / conversion tracking.
+        window.dispatchEvent(new CustomEvent('codejitsu-contact-submitted', {
+          detail: {
+            modalId,
+            formData: Object.fromEntries(new FormData(form).entries()),
+          },
+        }));
+        form.reset();
+        close();
+        showToast();
+      }).catch(function (err) {
+        console.error('[codejitsu-contact] EmailJS send failed', err);
+        alert('Sorry, something went wrong. Please call us or try again.');
+      }).finally(function () {
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.textContent = originalText;
+        }
+        if (window.grecaptcha && typeof window.grecaptcha.reset === 'function') {
+          try { window.grecaptcha.reset(); } catch (e) {}
+        }
+      });
+    });
+  }
+</script>

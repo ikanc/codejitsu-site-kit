@@ -15,7 +15,24 @@ export interface CodejitsuConfig {
   images?: ImagesConfig | false;
   llms?: LlmsConfig | false;
   deploy?: DeployConfig | false;
+  contact?: ContactConfig | false;
   audit?: AuditConfig;
+}
+
+export interface ContactConfig {
+  enabled?: boolean;
+  emailjs: {
+    /** EmailJS service ID, e.g. 'service_abc123'. */
+    serviceId: string;
+    /** EmailJS template ID, e.g. 'template_xyz789'. Template variables must be {{name}}, {{email}}, {{phone}}, {{message}}. */
+    templateId: string;
+    /** EmailJS public key. Safe to ship to the browser. */
+    publicKey: string;
+  };
+  /** Optional reCAPTCHA v2 sitekey. If set, the modal renders a captcha widget and blocks submit until solved. */
+  recaptcha?: {
+    siteKey: string;
+  };
 }
 
 export interface AuditConfig {

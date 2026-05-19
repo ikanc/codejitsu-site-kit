@@ -92,6 +92,16 @@ export async function runForms(ctx) {
     );
   }
 
+  // Static-site reCAPTCHA reminder. We can't check EmailJS's dashboard from
+  // here, but we can flag the assumption so the human verifies it.
+  const recaptchaForms = forms.filter((x) => x.hasCaptcha);
+  if (recaptchaForms.length > 0) {
+    results.push(info(
+      `${recaptchaForms.length} form(s) use reCAPTCHA`,
+      'Verify EmailJS template has "Verify reCAPTCHA" toggle ON with the SECRET key — otherwise the widget is theater on a static site (no server-side validation).'
+    ));
+  }
+
   // Consent (if required).
   if (formCfg.requireConsent === true) {
     const noConsent = forms.filter((x) => !x.hasConsent);

@@ -16,13 +16,13 @@
   ],
   "license": "MIT",
   "author": "Ika Balzam <ika@codejitsu.ca>",
-  "homepage": "https://github.com/ibalzam/codejitsu-site-kit#readme",
+  "homepage": "https://github.com/ikanc/codejitsu-site-kit#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/ibalzam/codejitsu-site-kit.git"
+    "url": "git+https://github.com/ikanc/codejitsu-site-kit.git"
   },
   "bugs": {
-    "url": "https://github.com/ibalzam/codejitsu-site-kit/issues"
+    "url": "https://github.com/ikanc/codejitsu-site-kit/issues"
   },
   "engines": {
     "node": ">=20"
@@ -60,6 +60,7 @@
       "default": "./modules/seo/src/sitemap.js"
     },
     "./seo/Head.astro": "./modules/seo/templates/Head.astro",
+    "./contact/ContactModal.astro": "./modules/contact/templates/ContactModal.astro",
     "./rehype/trailing-slash": "./modules/rehype/src/trailing-slash.mjs",
     "./images": {
       "types": "./modules/images/src/index.d.ts",
