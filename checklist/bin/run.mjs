@@ -11,7 +11,7 @@
  */
 import fs from 'fs';
 import path from 'path';
-import { loadConfig, isModuleEnabled } from '../../modules/config/src/load.js';
+import { loadConfig, isModuleEnabled } from '../../modules/config/src/load.mjs';
 
 const cwd = process.cwd();
 const distDir = path.join(cwd, 'dist');
@@ -163,7 +163,9 @@ const webpSet = new Set();
   }
 })(distDir);
 
-const PLACEHOLDER_RE = /\b(lorem ipsum|TODO|FIXME|XXX:|placeholder)\b/i;
+// Matches actual placeholder *content*, not CSS ::placeholder or HTML
+// placeholder="..." attributes (both legitimate).
+const PLACEHOLDER_RE = /\b(lorem ipsum|TODO:|FIXME:|XXX:)\b/i;
 
 for (const file of htmlFiles) {
   const rel = path.relative(distDir, file);

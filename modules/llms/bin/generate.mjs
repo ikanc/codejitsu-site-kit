@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import path from 'path';
-import { loadConfig, isModuleEnabled } from '../../config/src/load.js';
+import { loadConfig, isModuleEnabled } from '../../config/src/load.mjs';
 import { generateLlms } from '../src/generate.mjs';
 
 const cwd = process.cwd();

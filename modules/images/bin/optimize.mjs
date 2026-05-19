@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import path from 'path';
-import { loadConfig, isModuleEnabled } from '../../config/src/load.js';
+import { loadConfig, isModuleEnabled } from '../../config/src/load.mjs';
 import { optimizeImages } from '../src/optimize.mjs';
 import { autoBlogImages } from '../src/auto-blog.mjs';
 
