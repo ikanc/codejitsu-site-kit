@@ -1,0 +1,14 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "declaration": true,
+    "declarationMap": false,
+    "sourceMap": false,
+    "outDir": ".",
+    "allowImportingTsExtensions": false,
+    "isolatedModules": false
+  },
+  "include": ["src/**/*.ts", "modules/**/*.ts"],
+  "exclude": ["**/templates/**", "**/node_modules/**", "**/*.astro", "**/*.mjs"]
+}

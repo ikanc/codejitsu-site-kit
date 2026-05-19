@@ -5,3 +5,11 @@ dist
 .env
 .env.local
 *.tgz
+
+# tsc build output — emitted alongside .ts source
+src/**/*.js
+src/**/*.d.ts
+modules/**/src/**/*.js
+modules/**/src/**/*.d.ts
+# But keep .mjs (those are source, not built)
+!modules/**/src/**/*.mjs
