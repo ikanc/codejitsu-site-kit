@@ -17,6 +17,47 @@ export interface CodejitsuConfig {
   deploy?: DeployConfig | false;
   contact?: ContactConfig | false;
   audit?: AuditConfig;
+  blogWriter?: BlogWriterConfig | false;
+}
+
+export interface BlogWriterConfig {
+  enabled?: boolean;
+  /** Voice + register, free text. e.g. "professional but friendly, confident not boastful". */
+  tone: string;
+  /** What the company does + who it serves. Helps the writer ground posts in context. */
+  about: string;
+  /** Primary reader. e.g. "BC Lower Mainland homeowners planning HVAC upgrades". */
+  audience: string;
+  /** Service names that map to /services/<slug>/. Used for internal-link planning. */
+  services: string[];
+  /** Location names that map to /service-areas/<slug>/. */
+  locations: string[];
+  /** Exhaustive tag list. The writer refuses to invent new tags. */
+  approvedTags: string[];
+  wordCount: { min: number; max: number; default: number };
+  faqs?: { min: number; max: number };
+  internalLinks?: { min: number; max: number };
+  /** Pricing policy. 'brackets-only' = always show as range with context. */
+  pricing?: 'brackets-only' | 'allowed' | 'never-mention';
+  /** Free-text seasonal rules. e.g. "May-Sep: outdoor + AC; Oct-Nov: pre-winter prep". */
+  seasonalRules?: string;
+  /** Phrases the writer must NOT produce. e.g. ["In today's fast-paced world", "Look no further"]. */
+  bannedPhrases?: string[];
+  /** Frontmatter `author` default if a post doesn't specify one. */
+  authorDefault?: string;
+  imageStyle: BlogImageStyle;
+}
+
+export interface BlogImageStyle {
+  /** Full prompt-style description of the visual style: palette, framing, materials, mood. */
+  description: string;
+  /** Branding rule. e.g. "logo small in bottom-right corner, no other brand marks". */
+  branding: string;
+  /** Where final .webp files live. e.g. "public/assets/images/blog". */
+  outputDir: string;
+  /** Max words per generated prompt. Typical ≤ 60. */
+  maxWords: number;
+  realism: 'photorealistic' | 'illustration' | 'cartoon' | 'mixed';
 }
 
 export interface ContactConfig {

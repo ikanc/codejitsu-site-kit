@@ -3,6 +3,7 @@ import { parseArgs } from 'node:util';
 import { runBlog } from '../modules/cli/src/blog.mjs';
 import { runDeploySetup, runDeployTrigger } from '../modules/cli/src/deploy.mjs';
 import { runDoctor } from '../modules/cli/src/doctor.mjs';
+import { runBlogInit } from '../modules/cli/src/blog-init.mjs';
 import { runAudit } from '../modules/audit/src/run.mjs';
 
 const subcommand = process.argv[2];
@@ -11,6 +12,7 @@ const rest = process.argv.slice(3);
 const COMMANDS = {
   'blog:list': () => runBlog('blog:list'),
   'blog:drafts': () => runBlog('blog:drafts'),
+  'blog:init': () => runBlogInit(),
   'deploy:setup': () => runDeploySetup(),
   'deploy:run': () => runDeployTrigger(),
   doctor: () => runDoctor(),
@@ -56,6 +58,7 @@ function printHelp() {
   console.log(`Subcommands:`);
   console.log(`  blog:list           List every non-draft post with URL + image check`);
   console.log(`  blog:drafts         List future-dated (pending) posts only`);
+  console.log(`  blog:init           Install /blog, /blog-batch, /blog-images slash commands`);
   console.log(``);
   console.log(`  deploy:setup        Wire up daily Cloudflare deploy (prompts for hook URL)`);
   console.log(`  deploy:run          Trigger the Daily Deploy workflow once now`);
