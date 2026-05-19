@@ -63,7 +63,8 @@ export interface CommonBlogConfig {
 export interface BlogCollectionEntry {
   id: string;
   data: Record<string, unknown>;
-  body: string;
+  /** Optional — Astro's CollectionEntry types `body` as `string | undefined`. */
+  body?: string;
 }
 
 /** API for the fs (gray-matter) blog loader — normalized objects. */

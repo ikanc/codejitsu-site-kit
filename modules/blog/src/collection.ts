@@ -165,7 +165,7 @@ export function createBlogFromCollection<E extends BlogCollectionEntry = BlogCol
       author: (entry.data.author as string) ?? defaultAuthor,
       image: entry.data.image as string | undefined,
       tags: entry.data.tags as string[] | undefined,
-      readingTime: readingTime(entry.body).text,
+      readingTime: readingTime(entry.body ?? '').text,
     };
   }
 
