@@ -2,6 +2,7 @@
 import { parseArgs } from 'node:util';
 import { runBlog } from '../modules/cli/src/blog.mjs';
 import { runDeploySetup, runDeployTrigger } from '../modules/cli/src/deploy.mjs';
+import { runDoctor } from '../modules/cli/src/doctor.mjs';
 import { runAudit } from '../modules/audit/src/run.mjs';
 
 const subcommand = process.argv[2];
@@ -12,6 +13,7 @@ const COMMANDS = {
   'blog:drafts': () => runBlog('blog:drafts'),
   'deploy:setup': () => runDeploySetup(),
   'deploy:run': () => runDeployTrigger(),
+  doctor: () => runDoctor(),
   audit: () => {
     const { values } = parseArgs({
       args: rest,
@@ -57,6 +59,8 @@ function printHelp() {
   console.log(``);
   console.log(`  deploy:setup        Wire up daily Cloudflare deploy (prompts for hook URL)`);
   console.log(`  deploy:run          Trigger the Daily Deploy workflow once now`);
+  console.log(``);
+  console.log(`  doctor              Check Node + dependency versions are current (run BEFORE upgrading or scaffolding)`);
   console.log(``);
   console.log(`  audit               Run pre-delivery audit. Flags:`);
   console.log(`    --live <url>      Add live-URL checks (SSL, headers, 404, broken links)`);

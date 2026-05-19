@@ -27,6 +27,29 @@ CLIs (auto-discover `codejitsu.config.ts`):
 - `codejitsu-llms`
 - `codejitsu-check`
 
+## Always use latest stable versions
+
+When scaffolding a new project, adding a dependency, or upgrading an existing one — **do not rely on package versions from training data**. They will be wrong. Always check the npm registry first.
+
+### Required checks before suggesting any version
+
+- For a single package: `npm view <pkg> version` returns the actual current latest.
+- For the whole project: `npx codejitsu doctor` runs `npm outdated` and flags drift, with extra emphasis on the critical stack (Astro, React, Tailwind, TypeScript, codejitsu-core, the astro integrations).
+- For Node: `node --version` — current LTS major is what new projects should target.
+
+### When starting a new Codejitsu site
+
+Run `codejitsu doctor` immediately after `npm install` and before writing real code. If anything critical is behind, upgrade first. **Never start a new project on an outdated framework.**
+
+### When upgrading an existing site
+
+- Patch / minor bumps: `npm update` and re-run `codejitsu doctor` + `codejitsu audit`.
+- Major bumps (e.g. Astro N → N+1, TypeScript N → N+1): read the framework's migration guide, plan separately. Don't bundle into other work.
+
+### When the user asks "what version of X should we use"
+
+Run `npm view X version` and report the actual latest. Then offer pros/cons of any pinning concerns (peer-dep conflicts, etc.). Do NOT say a number from memory.
+
 ## Principles that apply to every Codejitsu site
 
 Non-negotiable unless the user explicitly opts out.
