@@ -102,6 +102,27 @@ prompt. Claude reads BLOG_WRITING.md from the installed package and follows
 that playbook. **The actual writing rules live in the package**, not in the
 site's repo — that's the robust part.
 
+## Conflict with existing site blog instructions
+
+Some Codejitsu sites already have `.claude/BLOG_INSTRUCTIONS.md` (pearl,
+workzen) — older bespoke instructions written before the kit existed.
+After running `blog:init`, the site has BOTH:
+- The kit's `/blog` command → reads BLOG_WRITING.md in the package
+- The site's `.claude/BLOG_INSTRUCTIONS.md` → may be referenced by Claude
+  ambiently when the site is open
+
+**Resolution when adopting the kit on such a site:**
+1. Read the existing `.claude/BLOG_INSTRUCTIONS.md`. Identify what's
+   genuinely site-specific (specific tone phrasings, special pricing
+   rules, internal link patterns).
+2. Move those site-specific bits into `codejitsu.config.ts.blogWriter`
+   (or `seasonalRules` / `bannedPhrases` fields).
+3. Delete or rename the old `.claude/BLOG_INSTRUCTIONS.md` to
+   `.claude/BLOG_INSTRUCTIONS.archived.md` so it doesn't get auto-loaded.
+4. Keep only the kit's slash command files in `.claude/commands/`.
+
+This avoids the "two contradicting instruction sources" problem.
+
 ## What must NOT be done
 
 - **Don't copy the playbook contents into the site.** The slash command

@@ -9,9 +9,9 @@ const PACKAGE_ROOT = path.resolve(
 
 /**
  * `codejitsu blog:init` — copies the blog-writer slash command templates
- * into the site's `.claude/commands/` directory. The templates are thin
- * references to playbooks that live in the package, so site updates flow
- * via `npm update` without re-running this command.
+ * into the site's `.claude/commands/`. The templates are thin references
+ * to playbooks that live in the package; updates flow via `npm update`
+ * without re-running this command.
  */
 export async function runBlogInit() {
   const cwd = process.cwd();
@@ -49,11 +49,43 @@ export async function runBlogInit() {
   console.log('');
   console.log(`${written} created, ${skipped} skipped.`);
   console.log('');
-  console.log('Next: configure the `blogWriter` block in codejitsu.config.ts.');
-  console.log('See `node_modules/@ibalzam/codejitsu-core/modules/blog-writer/CLAUDE.md`.');
+
+  // Detect whether blogWriter is already in the config.
+  const configCandidates = ['codejitsu.config.ts', 'codejitsu.config.mjs', 'codejitsu.config.json'];
+  let hasBlogWriter = false;
+  for (const name of configCandidates) {
+    const p = path.join(cwd, name);
+    if (fs.existsSync(p) && /blogWriter\s*:/.test(fs.readFileSync(p, 'utf8'))) {
+      hasBlogWriter = true;
+      break;
+    }
+  }
+
+  if (hasBlogWriter) {
+    console.log(c.green('✓') + ' `blogWriter` block detected in codejitsu.config — ready to use.');
+  } else {
+    console.log(c.yellow('!') + ' No `blogWriter` block in codejitsu.config yet.');
+    console.log('');
+    console.log(c.gray('Add this minimal block to your codejitsu.config.ts:'));
+    console.log('');
+    console.log(c.gray('  blogWriter: {'));
+    console.log(c.gray("    tone: 'professional, plain-spoken, confident not boastful',"));
+    console.log(c.gray("    about: '<what the company does + who it serves>',"));
+    console.log(c.gray("    audience: '<primary reader, e.g. BC homeowners ...>',"));
+    console.log(c.gray("    services: ['Service A', 'Service B'],"));
+    console.log(c.gray("    locations: ['City A', 'City B'],"));
+    console.log(c.gray('    // Optional with kit defaults: approvedTags, wordCount, faqs,'));
+    console.log(c.gray('    //   internalLinks, pricing, seasonalRules, bannedPhrases,'));
+    console.log(c.gray('    //   authorDefault, cadenceDays, imageStyle'));
+    console.log(c.gray('  },'));
+    console.log('');
+    console.log(c.gray('See node_modules/@ibalzam/codejitsu-core/modules/blog-writer/CLAUDE.md for the full shape.'));
+  }
+
   console.log('');
   console.log('Then in Claude Code:');
   console.log('  /blog              single post, interactive');
   console.log('  /blog-batch 20     schedule + outline 20 future posts');
   console.log('  /blog-images       image prompts for pending posts');
+  console.log('');
 }

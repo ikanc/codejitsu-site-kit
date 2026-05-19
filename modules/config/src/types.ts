@@ -20,34 +20,78 @@ export interface CodejitsuConfig {
   blogWriter?: BlogWriterConfig | false;
 }
 
+/**
+ * The minimum to enable blog writing: tone, about, audience, services,
+ * locations. Everything else has kit defaults that suit most sites.
+ *
+ * @example minimal
+ * ```ts
+ * blogWriter: {
+ *   tone: 'professional, plain-spoken, confident not boastful',
+ *   about: 'Veteran is a BC HVAC contractor serving the Lower Mainland',
+ *   audience: 'BC homeowners planning HVAC upgrades',
+ *   services: ['Heat Pump Installation', 'Furnace Installation'],
+ *   locations: ['Vancouver', 'Burnaby', 'Surrey'],
+ * }
+ * ```
+ */
 export interface BlogWriterConfig {
   enabled?: boolean;
-  /** Voice + register, free text. e.g. "professional but friendly, confident not boastful". */
+  /** REQUIRED. Voice + register, free text. e.g. "professional but friendly, confident not boastful". */
   tone: string;
-  /** What the company does + who it serves. Helps the writer ground posts in context. */
+  /** REQUIRED. What the company does + who it serves. Grounds the writer in context. */
   about: string;
-  /** Primary reader. e.g. "BC Lower Mainland homeowners planning HVAC upgrades". */
+  /** REQUIRED. Primary reader. e.g. "BC Lower Mainland homeowners planning HVAC upgrades". */
   audience: string;
-  /** Service names that map to /services/<slug>/. Used for internal-link planning. */
+  /** REQUIRED. Service names mapping to /services/<slug>/. Used for internal-link planning. */
   services: string[];
-  /** Location names that map to /service-areas/<slug>/. */
+  /** REQUIRED. Location names mapping to /service-areas/<slug>/. */
   locations: string[];
-  /** Exhaustive tag list. The writer refuses to invent new tags. */
-  approvedTags: string[];
-  wordCount: { min: number; max: number; default: number };
+  /** Exhaustive tag list. The writer refuses to invent new tags; if nothing fits it asks the user. Default: derives from `blog.categories` in config, or asks at first /blog use. */
+  approvedTags?: string[];
+  /** Default: { min: 1200, max: 2500, default: 1800 } (the "Long" tier). */
+  wordCount?: { min: number; max: number; default: number };
+  /** Default: { min: 5, max: 8 }. */
   faqs?: { min: number; max: number };
+  /** Default: { min: 3, max: 6 }. */
   internalLinks?: { min: number; max: number };
-  /** Pricing policy. 'brackets-only' = always show as range with context. */
+  /** Default: 'brackets-only' for service businesses; 'allowed' otherwise. */
   pricing?: 'brackets-only' | 'allowed' | 'never-mention';
-  /** Free-text seasonal rules. e.g. "May-Sep: outdoor + AC; Oct-Nov: pre-winter prep". */
+  /** Free-text seasonal rules. e.g. "May-Sep: outdoor + AC; Oct-Nov: pre-winter prep". Default: none. */
   seasonalRules?: string;
-  /** Phrases the writer must NOT produce. e.g. ["In today's fast-paced world", "Look no further"]. */
+  /** Phrases the writer must NOT produce. Default kit list includes "In today's fast-paced world", "When it comes to", "Look no further", "In conclusion". */
   bannedPhrases?: string[];
-  /** Frontmatter `author` default if a post doesn't specify one. */
+  /** Frontmatter `author` default. Default: `site.defaultAuthor` or `site.name`. */
   authorDefault?: string;
-  imageStyle: BlogImageStyle;
+  /** Cadence for /blog-batch, in days. Default: 4. */
+  cadenceDays?: number;
+  /** Image generation config. Required only if you'll use /blog-images. */
+  imageStyle?: BlogImageStyle;
 }
 
+/**
+ * @example photorealistic-architecture
+ * ```ts
+ * imageStyle: {
+ *   description: 'Photorealistic real-estate / architectural photography of the actual space the post is about. Wide landscape framing, eye-level. Bright natural daylight, modern desert-contemporary palette. Clean composition, lightly staged, no clutter, no text overlays.',
+ *   branding: 'Logo small in bottom-right corner. No other brand marks.',
+ *   outputDir: 'public/assets/images/blog',
+ *   maxWords: 60,
+ *   realism: 'photorealistic',
+ * }
+ * ```
+ *
+ * @example sloth-mascot-cartoon
+ * ```ts
+ * imageStyle: {
+ *   description: 'Cartoon sloth-mascot character relevant to the post topic, flat friendly colors, with a white rounded text box at the bottom containing a SHORT version of the title.',
+ *   branding: 'No watermarks, just the in-image character',
+ *   outputDir: 'public/images/blog/posts',
+ *   maxWords: 50,
+ *   realism: 'cartoon',
+ * }
+ * ```
+ */
 export interface BlogImageStyle {
   /** Full prompt-style description of the visual style: palette, framing, materials, mood. */
   description: string;

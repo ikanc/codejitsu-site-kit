@@ -10,19 +10,28 @@
 
 ## Step 0 — Read site config
 
-Same as `BLOG_WRITING.md` Step 0: load `codejitsu.config.ts.blogWriter`.
+Same as `BLOG_WRITING.md` Step 0: load `codejitsu.config.ts.blogWriter`. If
+missing, STOP with the same error message.
 
 Also read:
-- `src/content/blog/` — existing posts (find the latest `pubDate`)
+- `src/content/blog/` — existing posts (find latest `pubDate`)
 - `src/content.config.ts` — confirm the schema shape
 
 ## Step 1 — Decide cadence
 
-Default cadence is **4 days between posts** (matches workzen / pearl /
-veteran). If existing posts have a different rhythm, infer from the last
-10 and match it.
+Default cadence is **`blogWriter.cadenceDays` from config** (kit default: 4).
 
-Starting date = max(`latest existing pubDate`, today) + cadence.
+Cadence inference rules (in order):
+1. If `blogWriter.cadenceDays` is set in config → use it (don't infer).
+2. Else if `≥ 5` existing posts with future `pubDate` exist → measure gaps
+   between their consecutive dates. If the standard deviation of gaps is
+   `≤ 30%` of the median gap → use the median.
+3. Else (irregular spacing, e.g. WordPress import dates) → fall back to **4 days**.
+
+Starting date = `max(latest existing pubDate, today) + cadence`.
+
+If you fall back to default because of irregular existing dates, **mention it
+to the user** before continuing — they may want to override.
 
 ## Step 2 — Generate N topics
 

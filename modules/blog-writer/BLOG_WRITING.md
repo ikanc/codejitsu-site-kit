@@ -8,21 +8,43 @@
 ## Step 0 — Read site config
 
 Open `codejitsu.config.ts` at the site root and locate the `blogWriter` block.
+
+**If `blogWriter` is missing or empty**, STOP and tell the user:
+
+> "The blogWriter config block isn't set up yet. Add this to your codejitsu.config.ts:
+>
+> ```ts
+> blogWriter: {
+>   tone: '<one-line voice description>',
+>   about: '<what the company does + who it serves>',
+>   audience: '<primary reader, e.g. BC homeowners planning HVAC>',
+>   services: ['Service A', 'Service B'],
+>   locations: ['City A', 'City B'],
+> },
+> ```
+>
+> The other fields (approvedTags, wordCount, imageStyle, pricing, seasonalRules,
+> bannedPhrases) have sensible kit defaults. See `modules/blog-writer/CLAUDE.md`
+> for the full shape."
+
+Do not proceed without the block. Don't invent values.
+
 Everything in there is **site-specific input** for what you're about to write:
 
-- `tone` — voice + register
-- `about` — what the company does, who it serves
-- `audience` — primary reader
-- `services` — names that map to `/services/<slug>/`
-- `locations` — names that map to `/service-areas/<slug>/`
-- `approvedTags` — exhaustive; never invent new ones
-- `wordCount` — `{ min, max, default }`
-- `faqs` — `{ min, max }` (kit default 5-8)
-- `internalLinks` — `{ min, max }` per post
-- `pricing` — `'brackets-only' | 'allowed' | 'never-mention'`
-- `seasonalRules` — free text; current date should respect this
-- `bannedPhrases` — refuse to write these
-- `authorDefault` — what to put in frontmatter `author`
+- `tone` — voice + register (REQUIRED)
+- `about` — what the company does, who it serves (REQUIRED)
+- `audience` — primary reader (REQUIRED)
+- `services` — names that map to `/services/<slug>/` (REQUIRED)
+- `locations` — names that map to `/service-areas/<slug>/` (REQUIRED)
+- `approvedTags` — exhaustive. If unset, derive from `blog.categories` in config OR ask the user once
+- `wordCount` — `{ min, max, default }`. Kit default `{ 1200, 2500, 1800 }`
+- `faqs` — `{ min, max }`. Kit default `{ 5, 8 }`
+- `internalLinks` — `{ min, max }` per post. Kit default `{ 3, 6 }`
+- `pricing` — `'brackets-only' | 'allowed' | 'never-mention'`. Kit default `'brackets-only'` for service businesses
+- `seasonalRules` — free text; current date should respect this. Default: none
+- `bannedPhrases` — refuse to write these. Kit default includes "In today's fast-paced world", "When it comes to", "Look no further", "In conclusion"
+- `authorDefault` — frontmatter `author`. Default: `site.defaultAuthor` or `site.name`
+- `cadenceDays` — for /blog-batch. Kit default `4`
 
 Also detect the blog's frontmatter shape by reading `src/content.config.ts` and
 ONE existing post in `src/content/blog/`. Use that exact shape for the new post.
@@ -143,7 +165,12 @@ frontmatter shape exactly (detected in Step 0).
    - Phone: `[text](tel:+1...)` — use the actual number from `site.business.telephone`
    Best is one paragraph with both.
 10. **Approved tags only.** Pick 2-3 from `blogWriter.approvedTags`. Primary
-    tag first. Don't invent new tags. If nothing fits, ask the user.
+    tag first. **Never invent.** If nothing in `approvedTags` fits the topic,
+    STOP and ask the user:
+    > "None of your approved tags fit '<topic>'. Options: pick the closest fit
+    > from <list>, OR add a new tag to `blogWriter.approvedTags` in
+    > codejitsu.config.ts. Which?"
+    Don't auto-add tags to the config.
 11. **Image placeholder.** Frontmatter `image` field points to where the image
     WILL live: `<imageStyle.outputDir>/<slug>.webp`. The file doesn't exist
     yet; that's fine. Run `/blog-images` to generate prompts later.
@@ -175,16 +202,22 @@ exactly. Examples:
 
 ## Step 4 — Verify after writing
 
-- [ ] Word count is within target range
-- [ ] FAQ count is within `faqs.min`-`faqs.max`
-- [ ] Internal links count is within `internalLinks.min`-`internalLinks.max`
-- [ ] Tags are from `approvedTags` only
-- [ ] No em dashes (`—` or `–`) anywhere
-- [ ] No H1 in body
-- [ ] No `bannedPhrases` present
-- [ ] Pricing follows `pricing` policy
-- [ ] Frontmatter shape matches existing posts
-- [ ] At least one list (bullet, numbered, or table)
+After writing the file, **actively run these checks** by reading the file back
+and counting. Don't skip. If any fail, fix in place before reporting Step 5.
+
+- Word count is within `wordCount` target (count after stripping frontmatter)
+- FAQ count in frontmatter is within `faqs.min`-`faqs.max`
+- Internal links count: grep for `](/services/` and `](/service-areas/` in body
+- Tags are all from `approvedTags`
+- **No em dashes**: grep body for `—` and `–` — neither should appear
+- **No H1 in body**: first non-frontmatter line is NOT `# ...`
+- **No `bannedPhrases`**: grep body for each banned phrase
+- **Pricing policy**: if `'brackets-only'`, grep for standalone `$<digits>` not in a range
+- **Frontmatter shape**: matches existing posts in `src/content/blog/`
+- **At least one list**: body contains `- `, `1. `, OR `|` (markdown table)
+
+If any check fails, **fix the file then re-verify**. Surface unfixable issues
+to the user before reporting Step 5.
 
 ## Step 5 — Report back
 
