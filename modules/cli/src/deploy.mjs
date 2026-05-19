@@ -133,6 +133,55 @@ export async function runDeploySetup() {
   await offerTestRun(repo);
 }
 
+/**
+ * `codejitsu deploy:run` — fire the "Daily Deploy" workflow once on demand.
+ * Useful when you want to publish a scheduled blog post immediately instead
+ * of waiting for the next 13:00 UTC cron tick.
+ */
+export async function runDeployTrigger() {
+  const cwd = process.cwd();
+
+  const repo = detectGitHubRepo(cwd);
+  if (!repo) {
+    console.error(c.red('✗ Could not detect GitHub repo from git remote.'));
+    process.exit(1);
+  }
+
+  const ghAvailable = await commandExists('gh');
+  if (!ghAvailable) {
+    console.error(c.red('✗ `gh` CLI not in PATH. Install: https://cli.github.com/'));
+    process.exit(1);
+  }
+  const ghAuthed = await ghIsAuthed();
+  if (!ghAuthed) {
+    console.error(c.red('✗ `gh` not authenticated. Run: gh auth login'));
+    process.exit(1);
+  }
+
+  console.log(`Triggering "Daily Deploy" in ${c.bold(repo)}…`);
+  const trigger = await runGh(['workflow', 'run', 'Daily Deploy', '--repo', repo]);
+  if (trigger.code !== 0) {
+    console.error(c.red('✗ Failed to trigger workflow.'));
+    console.error('  ' + trigger.stderr.trim());
+    console.error('  Make sure .github/workflows/daily-deploy.yml exists and is committed.');
+    process.exit(1);
+  }
+  console.log(c.green('✓') + ' Workflow dispatched.');
+  console.log(c.gray(`  Watch: https://github.com/${repo}/actions/workflows/daily-deploy.yml`));
+
+  // Brief: show the most recent runs.
+  console.log('\nRecent runs:');
+  const list = await runGh([
+    'run', 'list',
+    '--workflow', 'daily-deploy.yml',
+    '--repo', repo,
+    '--limit', '3',
+  ]);
+  if (list.code === 0 && list.stdout.trim()) {
+    console.log(c.gray(list.stdout.trim().split('\n').map((l) => '  ' + l).join('\n')));
+  }
+}
+
 async function offerTestRun(repo) {
   const test = await prompt('\nTrigger the workflow once now to test? [y/N]: ');
   if (!/^y(es)?$/i.test(test.trim())) {
