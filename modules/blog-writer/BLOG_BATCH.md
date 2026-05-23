@@ -143,9 +143,22 @@ say stop: leave the file and exit. They can run `/blog` row by row whenever.
 
 ## Verify
 
-- [ ] N rows, all unique slugs
-- [ ] Dates respect cadence; no collisions with existing posts
-- [ ] Tags balanced across `approvedTags`
-- [ ] Service + city distribution covers most of the config lists
-- [ ] Season fits each `pubDate`'s month
-- [ ] No duplicate or near-duplicate topics
+After generating the schedule, **actively count** these distributions and
+rebalance the draft if any fail. Don't just eyeball.
+
+- N rows, all unique slugs (grep the slug column for duplicates)
+- Dates respect cadence; no collisions with existing post `pubDate`s
+- **Tag distribution**: no single primary tag exceeds 40% of the batch.
+  (For N=20, no tag appears as primary more than 8 times.)
+- **Topic-format distribution**: count comparison / how-to / troubleshooting /
+  seasonal across the batch. No single format exceeds ~40%. Roughly
+  30/30/20/20 is the target.
+- **City coverage**: cover most of `blogWriter.locations` before any city
+  repeats. For N ≤ locations.length, every city should be distinct.
+- **Service coverage**: spread across `blogWriter.services`; don't anchor half
+  the batch to one service.
+- Season fits each `pubDate`'s month per `seasonalRules`
+- No duplicate or near-duplicate topics (compare titles for keyword overlap)
+
+If any distribution check fails, **revise the batch before writing the file** —
+swap the over-represented topics for under-covered service/city/format combos.

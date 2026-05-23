@@ -31,10 +31,17 @@ export async function runBlogQuality(ctx) {
   const staleCutoff = new Date(today);
   staleCutoff.setUTCMonth(staleCutoff.getUTCMonth() - staleMonths);
 
+  // Tag governance: approvedTags is the controlled vocabulary (cap 12).
+  const blogWriter = config.blogWriter && typeof config.blogWriter === 'object' ? config.blogWriter : null;
+  const approvedTags = blogWriter?.approvedTags ?? null;
+  const approvedSet = approvedTags ? new Set(approvedTags) : null;
+
   const stalePosts = [];
   const missingDescription = [];
   const missingImage = [];
   const shortBody = [];
+  const htmlBodyPosts = [];
+  const unapprovedTagPosts = [];
   const dupTitle = new Map();
   const dupDesc = new Map();
 
@@ -44,6 +51,22 @@ export async function runBlogQuality(ctx) {
     if (draftField && data[draftField]) continue;
 
     const slug = fileName.replace(/\.md$/, '');
+
+    // Tag governance: collect category + tags, flag any not in approvedTags.
+    if (approvedSet) {
+      const postTags = [];
+      if (typeof data.category === 'string') postTags.push(data.category);
+      if (Array.isArray(data.tags)) postTags.push(...data.tags);
+      const bad = postTags.filter((t) => !approvedSet.has(t));
+      if (bad.length > 0) {
+        unapprovedTagPosts.push(`${slug}: ${[...new Set(bad)].join(', ')}`);
+      }
+    }
+
+    // Body format: flag posts whose body is raw HTML (legacy WordPress imports).
+    if (/^\s*<(p|h[1-6]|div|ul|ol|table)[\s>]/i.test(content.trimStart())) {
+      htmlBodyPosts.push(slug);
+    }
     const dateVal = data[dateField];
     const postDate = dateVal instanceof Date ? dateVal : (typeof dateVal === 'string' ? new Date(dateVal) : null);
 
@@ -69,6 +92,30 @@ export async function runBlogQuality(ctx) {
   }
 
   results.push(info(`${files.length} blog posts indexed`));
+
+  // Tag governance results.
+  if (!approvedTags) {
+    results.push(info('No blogWriter.approvedTags configured — tag governance not enforced'));
+  } else {
+    results.push(
+      approvedTags.length <= 12
+        ? pass(`approvedTags within cap (${approvedTags.length}/12)`)
+        : fail(`approvedTags exceeds cap (${approvedTags.length}/12)`,
+            'Trim to 12 or fewer. The cap keeps the taxonomy tight.')
+    );
+    results.push(summarize(
+      'All post tags + categories are in approvedTags',
+      unapprovedTagPosts,
+      'fail'
+    ));
+  }
+
+  results.push(summarize(
+    'Post bodies are markdown (not legacy HTML)',
+    htmlBodyPosts,
+    'warn'
+  ));
+
   results.push(summarize(
     `No posts older than ${staleMonths} months`,
     stalePosts,

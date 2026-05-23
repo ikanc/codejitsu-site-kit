@@ -36,7 +36,10 @@ Everything in there is **site-specific input** for what you're about to write:
 - `audience` — primary reader (REQUIRED)
 - `services` — names that map to `/services/<slug>/` (REQUIRED)
 - `locations` — names that map to `/service-areas/<slug>/` (REQUIRED)
-- `approvedTags` — exhaustive. If unset, derive from `blog.categories` in config OR ask the user once
+- `approvedTags` — **REQUIRED for writing; the single controlled vocabulary**
+  (hard cap: 12 per site). Governs BOTH `category` and `tags` fields. If unset,
+  STOP and ask the user to define up to 12 (or derive from the `category` enum
+  in `src/content.config.ts`). Never write a post with a tag outside this list.
 - `wordCount` — `{ min, max, default }`. Kit default `{ 1200, 2500, 1800 }`
 - `faqs` — `{ min, max }`. Kit default `{ 5, 8 }`
 - `internalLinks` — `{ min, max }` per post. Kit default `{ 3, 6 }`
@@ -47,7 +50,28 @@ Everything in there is **site-specific input** for what you're about to write:
 - `cadenceDays` — for /blog-batch. Kit default `4`
 
 Also detect the blog's frontmatter shape by reading `src/content.config.ts` and
-ONE existing post in `src/content/blog/`. Use that exact shape for the new post.
+ONE existing post in `src/content/blog/`. **Match the frontmatter field SHAPE
+(which fields exist), but NOT the body format and NOT the field VALUES.**
+
+**Body format: always write clean markdown.** Use `## H2`, `- bullets`,
+`1. numbered`, `| markdown | tables |`, `**bold**`. Do this EVEN IF existing
+posts have HTML in the body. Some sites (veteran) were WordPress-imported with
+raw HTML bodies inside their `.md` files. That is legacy, not the target.
+Astro renders markdown and inline-HTML identically, so a new markdown post sits
+fine alongside old HTML ones. Never copy `<p>`, `<h2>`, `<table>` from an
+existing post — write markdown.
+
+Critical distinction for taxonomy fields (`category`, `tags`):
+- A schema may have `category` (an enum — constrained) AND/OR `tags` (a free
+  array). Both are taxonomy.
+- `blogWriter.approvedTags` governs **every taxonomy field**. Put approved
+  values in `category` AND in `tags`.
+- **Do NOT copy free-form tag values from existing posts.** Many sites were
+  WordPress-imported with proliferated tags (every city, every appliance as a
+  tag). That sprawl is exactly what `approvedTags` exists to stop. Match the
+  field structure of old posts, ignore their messy values.
+- If `category` is an enum, pick the one approved value that fits. If `tags`
+  is a free array, fill it from `approvedTags` only — not invented descriptors.
 
 ## Step 1 — Gather inputs (interactive)
 
@@ -79,7 +103,38 @@ options:
   - "XL (2500+ words)" — Definitive guide
 ```
 
-Default = the `wordCount.default` from config.
+**Match the tier to the topic's natural scope — don't rubber-stamp the config
+default.** A focused 2-option comparison or a single-question explainer is
+usually Medium. A multi-angle definitive guide is Long or XL. Defaulting every
+post to "Long" produces either thin Long posts or padded ones.
+
+Rough mapping:
+- Comparison / "X vs Y" (2-3 options) → Medium (800-1200), occasionally Long
+- Single troubleshooting walkthrough → Medium (800-1200)
+- How-to / multi-step guide → Long (1500-2500)
+- Industry/buying guide covering many sub-topics → Long (1500-2500)
+- Definitive "everything about X" → XL (2500+)
+
+**The real quality bar is structural density + depth, NOT raw word count.**
+A post passes if every H2 has 2-3 real paragraphs, there's at least one
+list/table, and nothing reads thin. Never pad to hit a number — efficient,
+complete writing at 1200 words beats 1800 words of filler every time.
+
+**To make Long / XL posts genuinely long, add DEPTH, not words:**
+- At least one worked example or named scenario ("a Surrey homeowner switching
+  from a 15-year-old gas furnace stacked CleanBC + BC Hydro to land at roughly
+  X after rebates") — concrete, not abstract.
+- Real specifics: model families, actual process steps, real numbers inside
+  narratives, real local detail.
+- Granular sub-sections (H3s) where a topic has genuine sub-parts.
+- Show the concept applied, don't just define it.
+
+If a Long post comes in short, the fix is "what concrete example or applied
+detail is missing?" — never "add more adjectives." If after adding genuine
+depth the post is still ~1200 words and complete, it was a Medium topic;
+relabel it and move on. Do not pad.
+
+`wordCount` in config is a loose sanity band, not a target to chase.
 
 ### Question 3 — Primary service + city focus
 
@@ -152,25 +207,47 @@ frontmatter shape exactly (detected in Step 0).
    (default 5-8). Each FAQ = real question a reader would search; answer is
    2-4 sentences, concise and complete.
 6. **Internal links** — `internalLinks.min` to `internalLinks.max` from config
-   (default 3-6). Link to `/services/<slug>/`, `/service-areas/<slug>/`, and
-   `/services/<slug>/<city>/` patterns. Don't link the same URL twice.
+   (default 3-6). **Target the MIDDLE of the range, not the floor.** For a
+   3-6 range, aim for 4-5. Link the FIRST mention of each distinct city and
+   service in the body. A post that names a city six times but links it once
+   is under-linked — link the first occurrence. Don't link the same URL twice;
+   don't stuff. Patterns: `/services/<slug>/`, `/service-areas/<slug>/`,
+   `/services/<slug>/<city>/`.
 7. **Banned phrases** — if `bannedPhrases` is set in config, refuse them.
    Common offenders: "In today's fast-paced world…", "When it comes to…",
    "Look no further…", "In conclusion…".
-8. **Pricing** — if `pricing: 'brackets-only'`, every price reference is a
-   range with context. Never a single dollar figure. If `pricing: 'never-mention'`,
-   omit pricing entirely.
+8. **Pricing** — applies only to `pricing: 'brackets-only'`:
+   - **Service-cost CLAIMS must be bracket ranges with context.** What a
+     job/install/repair/service costs is always a range:
+     "a furnace replacement typically runs $6,500 - $10,000 depending on
+     venting and efficiency." Never a single figure for a cost claim.
+   - **Narrative examples may be specific.** A hypothetical scenario, a
+     story about one homeowner's invoice, or a comparison walkthrough can use
+     a specific number because it references a *scenario*, not a price claim:
+     "the technician quoted $1,400 for the control board" is fine inside a
+     decision-making narrative. When in doubt, bracket it.
+   - If `pricing: 'never-mention'`, omit all pricing.
 9. **CTA** — closing paragraph includes a call-to-action. Two patterns:
    - Modal: `[text](#contact)` or trigger-class link
    - Phone: `[text](tel:+1...)` — use the actual number from `site.business.telephone`
    Best is one paragraph with both.
-10. **Approved tags only.** Pick 2-3 from `blogWriter.approvedTags`. Primary
-    tag first. **Never invent.** If nothing in `approvedTags` fits the topic,
-    STOP and ask the user:
-    > "None of your approved tags fit '<topic>'. Options: pick the closest fit
-    > from <list>, OR add a new tag to `blogWriter.approvedTags` in
-    > codejitsu.config.ts. Which?"
-    Don't auto-add tags to the config.
+10. **Approved tags only — for ALL taxonomy fields, hard cap 12.** `approvedTags`
+    is the single controlled vocabulary, max 12 per site. It governs both
+    `category` (if the schema has an enum) and `tags` (if the schema has a free
+    array). Put `approvedTags` values in both. Pick 2-3, primary first.
+    **Never invent, even if existing posts use free-form tags.** WordPress
+    imports often have proliferated tags (cities, appliance types) — that
+    sprawl is exactly what `approvedTags` prevents. Match the field *shape* of
+    old posts, not their values.
+
+    **If nothing in `approvedTags` fits the topic**, STOP and ask:
+    > "None of your approved tags fit '<topic>'. Either: (a) pick the closest
+    > from <list>, or (b) add a new approved tag. You currently have <N>/12.
+    > [If N < 12:] I can add '<proposed>' to blogWriter.approvedTags. [If N = 12:]
+    > You're at the 12-tag cap — to add one, tell me which existing tag to remove."
+
+    Only add a tag to the config with explicit user approval, and never exceed
+    12. Don't auto-add.
 11. **Image placeholder.** Frontmatter `image` field points to where the image
     WILL live: `<imageStyle.outputDir>/<slug>.webp`. The file doesn't exist
     yet; that's fine. Run `/blog-images` to generate prompts later.
@@ -205,10 +282,26 @@ exactly. Examples:
 After writing the file, **actively run these checks** by reading the file back
 and counting. Don't skip. If any fail, fix in place before reporting Step 5.
 
-- Word count is within `wordCount` target (count after stripping frontmatter)
-- FAQ count in frontmatter is within `faqs.min`-`faqs.max`
-- Internal links count: grep for `](/services/` and `](/service-areas/` in body
-- Tags are all from `approvedTags`
+- **Structural density (the real bar):** every H2 has 2-3 paragraphs; at least
+  one list or table; no section reads thin. This matters more than word count.
+- Word count is a SOFT signal, not a gate. Do not pad to hit it. If a post
+  intended as Long lands short, ask "what concrete example / applied detail
+  is missing?" and add depth — OR accept it was a Medium topic and relabel.
+  Never add filler to chase a number. A dense, complete 1200-word post passes.
+- FAQ count in frontmatter is within `faqs.min`-`faqs.max`.
+- **Internal links — mechanical check, do this explicitly:**
+  1. List every distinct service AND city you named in the body.
+  2. You should have linked the FIRST mention of each (up to `internalLinks.max`).
+  3. Count your actual `](/services/` + `](/service-areas/` links.
+  4. If the count is below the range midpoint AND you have named-but-unlinked
+     services/cities, add those links now. Don't ship at the floor when you
+     mentioned linkable things and skipped them.
+  Example failure: post discusses heat pumps, furnaces, AND air conditioning
+  but only links two of them — link the third.
+- **Every taxonomy field uses `approvedTags`**: check BOTH `category` and
+  `tags` in the frontmatter. If `tags` contains any value not in
+  `approvedTags` (e.g. a city name or appliance copied from old posts),
+  that's a fail — replace with approved values.
 - **No em dashes**: grep body for `—` and `–` — neither should appear
 - **No H1 in body**: first non-frontmatter line is NOT `# ...`
 - **No `bannedPhrases`**: grep body for each banned phrase
