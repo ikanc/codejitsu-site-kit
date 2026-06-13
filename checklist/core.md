@@ -9,7 +9,7 @@ The runner covers the easy stuff (file presence, meta tags, canonical, schema sc
 - [ ] `npm run build` exits 0 with no warnings about missing pages, unresolved imports, or broken links.
 - [ ] `dist/` contains static HTML for every expected route. No `.html` route is missing.
 - [ ] `wrangler.toml` is present and points to `dist`.
-- [ ] `.github/workflows/daily-deploy.yml` exists; the `CLOUDFLARE_DEPLOY_HOOK_URL` secret is set in the repo (skip if site has no scheduled content).
+- [ ] `.github/workflows/daily-deploy.yml` exists; the deploy-hook secret is set in the repo — `CLOUDFLARE_DEPLOY_HOOK_URL` (single site) or `CLOUDFLARE_DEPLOY_HOOK_URLS` (comma-separated, one Deploy Hook per Pages project, for a multi-site monorepo). Skip if the site has no scheduled content.
 
 ## URLs + routing
 

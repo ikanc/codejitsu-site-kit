@@ -3,9 +3,14 @@ name: Daily Deploy
 # Triggers a Cloudflare Pages rebuild each morning so any scheduled content
 # whose publish date has arrived graduates from hidden to public.
 #
-# Requires a repository secret named CLOUDFLARE_DEPLOY_HOOK_URL holding
-# the Deploy Hook URL from Cloudflare Pages (Project settings -> Builds &
+# Single-site repo: set the secret CLOUDFLARE_DEPLOY_HOOK_URL to the one
+# Deploy Hook URL from Cloudflare Pages (Project settings -> Builds &
 # deployments -> Deploy hooks).
+#
+# Multi-site monorepo (one repo -> several Pages projects): set the secret
+# CLOUDFLARE_DEPLOY_HOOK_URLS to ALL the projects' Deploy Hook URLs, separated
+# by commas (newlines also work). The job pings every URL so each site
+# rebuilds. If both secrets are set, the plural one wins.
 
 on:
   schedule:
@@ -18,12 +23,23 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Ping Cloudflare deploy hook
+      - name: Ping Cloudflare deploy hook(s)
         env:
+          HOOKS: ${{ secrets.CLOUDFLARE_DEPLOY_HOOK_URLS }}
           HOOK: ${{ secrets.CLOUDFLARE_DEPLOY_HOOK_URL }}
         run: |
-          if [ -z "$HOOK" ]; then
-            echo "CLOUDFLARE_DEPLOY_HOOK_URL secret is not set"
+          # Prefer the plural (multi-URL) secret; fall back to the singular one.
+          urls="$HOOKS"
+          [ -z "$urls" ] && urls="$HOOK"
+          if [ -z "$urls" ]; then
+            echo "Neither CLOUDFLARE_DEPLOY_HOOK_URLS nor CLOUDFLARE_DEPLOY_HOOK_URL is set"
             exit 1
           fi
-          curl --fail-with-body -X POST "$HOOK"
+          # Accept commas, newlines, or spaces as separators between URLs.
+          failed=0
+          for url in $(echo "$urls" | tr ',\n' '  '); do
+            [ -z "$url" ] && continue
+            echo "Pinging deploy hook: ${url%%\?*}"
+            curl --fail-with-body -X POST "$url" || failed=1
+          done
+          exit $failed

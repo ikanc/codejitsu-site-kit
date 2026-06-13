@@ -393,7 +393,11 @@ npx codejitsu deploy:setup
 Interactive wizard:
 - Copies `.github/workflows/daily-deploy.yml` + `wrangler.toml` from
   package templates if missing.
-- Prompts for the Cloudflare deploy hook URL.
+- Prompts for the Cloudflare deploy hook URL(s). For a multi-site monorepo
+  (one repo → several Pages projects), enter every project's hook URL
+  comma-separated; they're stored in `CLOUDFLARE_DEPLOY_HOOK_URLS` and the
+  workflow pings each. A single site uses `CLOUDFLARE_DEPLOY_HOOK_URL`.
+  See `modules/deploy/CLAUDE.md` → "Multi-site monorepos".
 - Stores it as a GH Actions secret via `gh secret set`.
 - Optionally triggers a test run.
 
