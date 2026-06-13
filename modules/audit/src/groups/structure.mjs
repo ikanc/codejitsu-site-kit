@@ -75,12 +75,15 @@ export async function runStructure(ctx) {
           const secrets = await listSecrets(repo);
           if (secrets === null) {
             results.push(info('Skipped GH secret check (gh not authenticated for this repo)'));
+          } else if (secrets.includes('CLOUDFLARE_DEPLOY_HOOK_URLS')) {
+            results.push(pass(`CLOUDFLARE_DEPLOY_HOOK_URLS set in ${repo} (multi-site)`));
           } else if (secrets.includes('CLOUDFLARE_DEPLOY_HOOK_URL')) {
             results.push(pass(`CLOUDFLARE_DEPLOY_HOOK_URL set in ${repo}`));
           } else {
             results.push(warn(
-              'CLOUDFLARE_DEPLOY_HOOK_URL secret missing',
-              'Daily deploy workflow will fail. Run `npx codejitsu deploy:setup` to configure.'
+              'Deploy hook secret missing (CLOUDFLARE_DEPLOY_HOOK_URL or _URLS)',
+              'Daily deploy workflow will fail. Run `npx codejitsu deploy:setup` to configure. ' +
+                'For a multi-site monorepo, set CLOUDFLARE_DEPLOY_HOOK_URLS (one hook per Pages project, comma-separated).'
             ));
           }
         }

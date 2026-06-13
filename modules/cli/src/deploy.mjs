@@ -93,13 +93,19 @@ export async function runDeploySetup() {
   }
 
   // ─── GitHub secret ───────────────────────────────────────────────────
+  // Single site → CLOUDFLARE_DEPLOY_HOOK_URL. Multi-site monorepo (one repo,
+  // several Pages projects) → CLOUDFLARE_DEPLOY_HOOK_URLS holding every
+  // project's hook, comma-separated. The daily-deploy workflow prefers the
+  // plural secret and pings each URL.
   console.log('\nChecking GitHub Actions secrets…');
   const secrets = await listSecrets(repo);
-  const hasSecret = secrets.includes('CLOUDFLARE_DEPLOY_HOOK_URL');
+  const hasSingular = secrets.includes('CLOUDFLARE_DEPLOY_HOOK_URL');
+  const hasPlural = secrets.includes('CLOUDFLARE_DEPLOY_HOOK_URLS');
 
-  if (hasSecret) {
-    console.log(c.green('✓') + ' CLOUDFLARE_DEPLOY_HOOK_URL is set');
-    const rotate = await prompt('\nRotate the deploy hook URL? [y/N]: ');
+  if (hasSingular || hasPlural) {
+    const which = hasPlural ? 'CLOUDFLARE_DEPLOY_HOOK_URLS' : 'CLOUDFLARE_DEPLOY_HOOK_URL';
+    console.log(c.green('✓') + ` ${which} is set`);
+    const rotate = await prompt('\nRotate / re-enter the deploy hook URL(s)? [y/N]: ');
     if (!/^y(es)?$/i.test(rotate.trim())) {
       console.log(c.gray('\nNothing to do. The daily deploy is configured.\n'));
       await offerTestRun(repo);
@@ -107,28 +113,51 @@ export async function runDeploySetup() {
     }
   }
 
-  // Prompt for URL.
+  // Prompt for URL(s).
   console.log('');
-  console.log('Get a deploy hook URL from Cloudflare Pages:');
+  console.log('Get a deploy hook URL from Cloudflare Pages (one per Pages project):');
   console.log(c.gray('  1. Open Cloudflare dashboard → Pages → ' + (pagesName ?? 'your project') + ' → Settings'));
   console.log(c.gray('  2. Builds & deployments → Deploy hooks → "Add deploy hook"'));
   console.log(c.gray('  3. Name: "daily-scheduled-content" — Branch: main'));
   console.log(c.gray('  4. Copy the URL'));
+  console.log(c.gray('  Multi-site monorepo: repeat for every Pages project and paste all URLs comma-separated.'));
   console.log('');
 
-  const url = (await prompt('Paste the deploy hook URL: ')).trim();
-  if (!url.startsWith('https://api.cloudflare.com/client/v4/pages/webhooks/deploy_hooks/')) {
-    console.error(c.red('\n✗ That doesn\'t look like a Cloudflare Pages deploy hook URL.'));
-    console.error('  Expected prefix: https://api.cloudflare.com/client/v4/pages/webhooks/deploy_hooks/');
+  const raw = (await prompt('Paste the deploy hook URL(s), comma-separated: ')).trim();
+  const urls = raw.split(',').map((u) => u.trim()).filter(Boolean);
+  const prefix = 'https://api.cloudflare.com/client/v4/pages/webhooks/deploy_hooks/';
+  if (urls.length === 0) {
+    console.error(c.red('\n✗ No deploy hook URL provided.'));
+    process.exit(1);
+  }
+  const bad = urls.filter((u) => !u.startsWith(prefix));
+  if (bad.length > 0) {
+    console.error(c.red('\n✗ These don\'t look like Cloudflare Pages deploy hook URLs:'));
+    bad.forEach((u) => console.error('  ' + u));
+    console.error('  Expected prefix: ' + prefix);
     process.exit(1);
   }
 
-  const setOk = await setSecret(repo, 'CLOUDFLARE_DEPLOY_HOOK_URL', url);
+  // One URL → singular secret (back-compat). Multiple → plural secret.
+  const secretName = urls.length > 1 ? 'CLOUDFLARE_DEPLOY_HOOK_URLS' : 'CLOUDFLARE_DEPLOY_HOOK_URL';
+  const setOk = await setSecret(repo, secretName, urls.join(','));
   if (!setOk) {
     console.error(c.red('\n✗ Failed to set GitHub secret.'));
     process.exit(1);
   }
-  console.log(c.green('✓') + ` Secret CLOUDFLARE_DEPLOY_HOOK_URL set in ${repo}`);
+  console.log(
+    c.green('✓') + ` Secret ${secretName} set in ${repo}` +
+    (urls.length > 1 ? ` (${urls.length} hooks)` : '')
+  );
+
+  // Switching singular → plural: the stale singular secret is ignored by the
+  // workflow (plural wins) but is confusing. Remove it.
+  if (urls.length > 1 && hasSingular) {
+    const cleaned = await deleteSecret(repo, 'CLOUDFLARE_DEPLOY_HOOK_URL');
+    if (cleaned) {
+      console.log(c.gray('  Removed now-redundant CLOUDFLARE_DEPLOY_HOOK_URL (plural secret takes precedence).'));
+    }
+  }
 
   await offerTestRun(repo);
 }
@@ -233,6 +262,11 @@ async function listSecrets(repo) {
 
 async function setSecret(repo, name, value) {
   const r = await runGh(['secret', 'set', name, '--repo', repo, '--body', value]);
+  return r.code === 0;
+}
+
+async function deleteSecret(repo, name) {
+  const r = await runGh(['secret', 'delete', name, '--repo', repo]);
   return r.code === 0;
 }
 

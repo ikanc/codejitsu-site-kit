@@ -73,7 +73,7 @@ function printHelp() {
   console.log(`  blog:init           Install /blog, /blog-batch, /blog-images slash commands`);
   console.log(`  blog:selftest       Cold-Claude write a throwaway post + grade it. Flags: --topic, --model`);
   console.log(``);
-  console.log(`  deploy:setup        Wire up daily Cloudflare deploy (prompts for hook URL)`);
+  console.log(`  deploy:setup        Wire up daily Cloudflare deploy (prompts for hook URL(s); multi-site aware)`);
   console.log(`  deploy:run          Trigger the Daily Deploy workflow once now`);
   console.log(``);
   console.log(`  doctor              Check Node + dependency versions are current (run BEFORE upgrading or scaffolding)`);
